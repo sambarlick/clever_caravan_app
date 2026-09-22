@@ -27,4 +27,4 @@ is 5 minutes.
 
 ## Support
 
-sam@veremote.com.au
+sam.smarthome.tech@gmail.com

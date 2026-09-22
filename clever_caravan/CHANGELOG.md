@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.2
+- Corrected the support address.
+
 ## 0.2.1
 - Added Clever Caravan branding, documentation and changelog.
 

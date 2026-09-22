@@ -1,5 +1,5 @@
 name: Clever Caravan
-version: "0.1.0"
+version: "0.1.1"
 slug: clever_caravan
 description: Installs and updates Clever Caravan integrations.
 url: https://github.com/sambarlick/clever_caravan_app

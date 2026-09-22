@@ -1,5 +1,5 @@
 name: Clever Caravan
-version: "0.1.1"
+version: "0.2.0"
 slug: clever_caravan
 description: Installs and updates Clever Caravan integrations.
 url: https://github.com/sambarlick/clever_caravan_app
@@ -7,7 +7,7 @@ arch:
   - aarch64
   - amd64
 init: false
-startup: once
+startup: services
 boot: auto
 hassio_api: true
 hassio_role: homeassistant
@@ -16,5 +16,7 @@ map:
     read_only: false
 options:
   tpms: false
+  check_interval_minutes: 5
 schema:
   tpms: bool
+  check_interval_minutes: int(1,1440)

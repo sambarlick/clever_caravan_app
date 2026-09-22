@@ -2,3 +2,6 @@ configuration:
   tpms:
     name: "Clever Caravan: TPMS"
     description: Tyre pressure monitoring. Supported hardware - Safety Sam sensors.
+  check_interval_minutes:
+    name: Check interval (minutes)
+    description: How often the App checks for integration changes.

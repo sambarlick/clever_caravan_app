@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.3.1
+- Updated Clever Caravan: Location to 0.7.7.
+
 ## 0.3.0
 - Added Clever Caravan: Location 0.7.6.
 

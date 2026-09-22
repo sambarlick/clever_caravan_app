@@ -1,0 +1,210 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Clever Caravan: Location",
+        "description": "Pick the type of location source.",
+        "data": {
+          "source": "Source type"
+        }
+      },
+      "reconfigure": {
+        "title": "Change location source",
+        "description": "Change where location comes from. Existing entities and history are kept. Pick the source type \u2014 the next step collects its settings.",
+        "data": {
+          "source": "Source type"
+        }
+      },
+      "usb": {
+        "title": "USB GPS dongle",
+        "description": "Pick the GPS device. Detected USB serial devices appear in the dropdown \u2014 if your dongle isn't listed, type the path manually.",
+        "data": {
+          "usb_device": "GPS device path",
+          "usb_baudrate": "Baudrate"
+        }
+      },
+      "entities": {
+        "title": "Source entities",
+        "description": "Point the integration at the lat/lon entities your {source} setup exposes.",
+        "data": {
+          "latitude_entity": "Latitude entity",
+          "longitude_entity": "Longitude entity",
+          "elevation_entity": "Elevation entity (optional)",
+          "speed_entity": "Speed entity (km/h, optional)"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Clever Caravan: Location is already configured (only one instance is supported)."
+    }
+  },
+  "selector": {
+    "source": {
+      "options": {
+        "usb": "USB GPS dongle (plugged into HA host)",
+        "entity": "Entity-based (Starlink, device tracker, MQTT GPS sensors)",
+        "manual": "Manual (input_number helpers)"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "latitude": {
+        "name": "Latitude"
+      },
+      "longitude": {
+        "name": "Longitude"
+      },
+      "elevation": {
+        "name": "Elevation"
+      },
+      "speed": {
+        "name": "Speed"
+      },
+      "heading": {
+        "name": "Heading",
+        "state": {
+          "N": "North",
+          "NNE": "North-northeast",
+          "NE": "Northeast",
+          "ENE": "East-northeast",
+          "E": "East",
+          "ESE": "East-southeast",
+          "SE": "Southeast",
+          "SSE": "South-southeast",
+          "S": "South",
+          "SSW": "South-southwest",
+          "SW": "Southwest",
+          "WSW": "West-southwest",
+          "W": "West",
+          "WNW": "West-northwest",
+          "NW": "Northwest",
+          "NNW": "North-northwest"
+        }
+      },
+      "bearing": {
+        "name": "Bearing"
+      },
+      "status": {
+        "name": "Status",
+        "state": {
+          "Driving": "Driving",
+          "Not Driving": "Not Driving",
+          "Parked Up": "Parked Up"
+        }
+      },
+      "gradient": {
+        "name": "Gradient",
+        "state": {
+          "Climbing": "Climbing",
+          "Level": "Level",
+          "Descending": "Descending"
+        }
+      },
+      "climb_rate": {
+        "name": "Climb rate"
+      },
+      "fix_quality": {
+        "name": "GPS fix quality",
+        "state": {
+          "No Signal": "No Signal",
+          "Standard (~3-5m accuracy)": "Standard (~3-5m accuracy)",
+          "Standard (~1m accuracy)": "Standard (~1m accuracy)",
+          "High Precision (~1cm accuracy)": "High Precision (~1cm accuracy)",
+          "High Precision (~10cm accuracy)": "High Precision (~10cm accuracy)",
+          "Estimated (predicted from last movement)": "Estimated (predicted from last movement)",
+          "Enhanced (~1m accuracy)": "Enhanced (~1m accuracy)"
+        }
+      },
+      "fix_mode": {
+        "name": "GPS fix mode",
+        "state": {
+          "No Fix": "No Fix",
+          "2D Fix": "2D Fix",
+          "3D Fix": "3D Fix"
+        }
+      },
+      "satellites_used": {
+        "name": "Satellites used"
+      },
+      "satellites_visible": {
+        "name": "Satellites visible"
+      },
+      "hdop": {
+        "name": "HDOP"
+      },
+      "accuracy_horizontal": {
+        "name": "Horizontal accuracy"
+      },
+      "accuracy_vertical": {
+        "name": "Vertical accuracy"
+      },
+      "city": {
+        "name": "City"
+      },
+      "state": {
+        "name": "State"
+      },
+      "country": {
+        "name": "Country"
+      },
+      "postcode": {
+        "name": "Postcode"
+      },
+      "current_location": {
+        "name": "Current location"
+      },
+      "population": {
+        "name": "Population"
+      },
+      "statistical_area": {
+        "name": "Statistical Area"
+      },
+      "statistical_area_size": {
+        "name": "Statistical Area size"
+      },
+      "population_density": {
+        "name": "Population density"
+      },
+      "gps_atomic_time": {
+        "name": "GPS atomic time"
+      },
+      "wikipedia_summary": {
+        "name": "Wikipedia summary"
+      },
+      "climate_mean_max": {
+        "name": "Climate mean max"
+      },
+      "climate_mean_min": {
+        "name": "Climate mean min"
+      },
+      "climate_mean_temp": {
+        "name": "Climate mean temp"
+      },
+      "climate_monthly_rainfall": {
+        "name": "Climate monthly rainfall"
+      }
+    },
+    "binary_sensor": {
+      "gps_healthy": {
+        "name": "GPS healthy"
+      }
+    },
+    "image": {
+      "wikipedia_image": {
+        "name": "Wikipedia image"
+      }
+    },
+    "button": {
+      "update": {
+        "name": "Update"
+      }
+    }
+  },
+  "services": {
+    "update": {
+      "name": "Force update",
+      "description": "Force an immediate update of zone.home, system timezone, and reverse-geocode sensors using the latest GPS fix."
+    }
+  }
+}

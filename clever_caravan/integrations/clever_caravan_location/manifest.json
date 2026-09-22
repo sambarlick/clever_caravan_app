@@ -1,0 +1,22 @@
+{
+  "domain": "clever_caravan_location",
+  "name": "Clever Caravan: Location",
+  "version": "0.7.6",
+  "integration_type": "service",
+  "iot_class": "local_push",
+  "config_flow": true,
+  "documentation": "https://github.com/sambarlick/clever_caravan_integrations/tree/main/custom_components/clever_caravan_location",
+  "issue_tracker": "https://github.com/sambarlick/clever_caravan_integrations/issues",
+  "codeowners": [
+    "@sambarlick"
+  ],
+  "after_dependencies": [
+    "zone"
+  ],
+  "requirements": [
+    "pyserial-asyncio-fast==0.16",
+    "pynmea2==1.19.0",
+    "tzfpy==1.3.0"
+  ],
+  "description": "Logic-gated GPS tracking with parked snapshots and Australia-aware geocoding."
+}

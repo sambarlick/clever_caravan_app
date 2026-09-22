@@ -33,6 +33,7 @@ mkdir -p "$DEST"
 while true; do
   changed=false
   sync_integration tpms clever_caravan_tpms
+  sync_integration location clever_caravan_location
 
   if $changed; then
     bashio::log.info "Changes made. Restarting Home Assistant."

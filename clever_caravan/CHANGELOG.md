@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.3.0
+- Added Clever Caravan: Location 0.7.6.
+
 ## 0.2.2
 - Corrected the support address.
 

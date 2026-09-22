@@ -1,0 +1,7 @@
+update:
+  name: Force update
+  description: >
+    Force an immediate update of zone.home, system timezone, and the
+    reverse-geocode sensors using the latest GPS fix. Bypasses normal
+    throttling. Useful for testing or when an automation needs to
+    refresh state on demand.

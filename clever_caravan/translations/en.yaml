@@ -1,0 +1,4 @@
+configuration:
+  tpms:
+    name: "Clever Caravan: TPMS"
+    description: Tyre pressure monitoring. Supported hardware - Safety Sam sensors.

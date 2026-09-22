@@ -1,0 +1,20 @@
+{
+  "domain": "clever_caravan_tpms",
+  "name": "Clever Caravan: TPMS",
+  "bluetooth": [
+    {
+      "manufacturer_id": 256,
+      "service_uuid": "0000fbb0-0000-1000-8000-00805f9b34fb",
+      "connectable": false
+    }
+  ],
+  "codeowners": ["@sambarlick"],
+  "config_flow": true,
+  "dependencies": ["bluetooth_adapters"],
+  "documentation": "https://github.com/sambarlick/clever_caravan_integrations/tree/main/custom_components/clever_caravan_tpms",
+  "integration_type": "device",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/sambarlick/clever_caravan_integrations/issues",
+  "requirements": [],
+  "version": "0.1.1"
+}

@@ -1,7 +1,7 @@
 name: Clever Caravan
-version: "0.2.0"
+version: "0.2.1"
 slug: clever_caravan
-description: Installs and updates Clever Caravan integrations.
+description: Installs and keeps Clever Caravan integrations up to date on this rig.
 url: https://github.com/sambarlick/clever_caravan_app
 arch:
   - aarch64

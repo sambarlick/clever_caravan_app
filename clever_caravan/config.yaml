@@ -1,5 +1,5 @@
 name: Clever Caravan
-version: "0.3.5"
+version: "0.4.0"
 slug: clever_caravan
 description: Installs and keeps Clever Caravan integrations up to date on this rig.
 url: https://github.com/sambarlick/clever_caravan_app
@@ -22,6 +22,8 @@ options:
   dashboard: false
   weather: false
   check_interval_minutes: 5
+  update_window_start: "02:00"
+  update_window_hours: 2
 schema:
   tpms: bool
   location: bool
@@ -30,3 +32,5 @@ schema:
   dashboard: bool
   weather: bool
   check_interval_minutes: int(1,1440)
+  update_window_start: str
+  update_window_hours: int(1,24)

@@ -20,3 +20,9 @@ configuration:
   check_interval_minutes:
     name: Check interval (minutes)
     description: How often the App checks for integration changes.
+  update_window_start:
+    name: Update window start
+    description: Time of day (HH:MM) when updates and restarts may happen.
+  update_window_hours:
+    name: Update window length (hours)
+    description: How long the update window stays open.

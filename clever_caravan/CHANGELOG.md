@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.0
+- The App now updates itself, so releases no longer need to be installed by hand.
+- Updates and restarts happen in a configurable window, 02:00 by default.
+- Installs and syncs immediately on start, then follows the window.
+
 ## 0.3.5
 - Added Clever Caravan: Weather 0.4.2. All integrations are now bundled.
 

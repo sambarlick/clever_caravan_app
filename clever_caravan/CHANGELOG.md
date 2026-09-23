@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.3.2
+- Added Clever Caravan: Waymote 0.4.4.
+
 ## 0.3.1
 - Updated Clever Caravan: Location to 0.7.7.
 

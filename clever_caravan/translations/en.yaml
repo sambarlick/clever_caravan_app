@@ -5,6 +5,9 @@ configuration:
   location:
     name: "Clever Caravan: Location"
     description: GPS tracking with parked snapshots and Australia-aware geocoding.
+  waymote:
+    name: "Clever Caravan: Waymote"
+    description: Control and monitoring for the Waymote CAN-bus bridge.
   check_interval_minutes:
     name: Check interval (minutes)
     description: How often the App checks for integration changes.

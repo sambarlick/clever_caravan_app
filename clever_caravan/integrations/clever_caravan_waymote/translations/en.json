@@ -1,0 +1,32 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Waymote",
+        "description": "Enter the address of the Waymote bridge on your caravan network.",
+        "data": {
+          "host": "Host or IP address",
+          "port": "Port"
+        }
+      },
+      "outputs": {
+        "title": "Name your outputs",
+        "description": "Type a name for each output that is wired. Leave a row blank to hide that output. You can change these later from the integration's settings."
+      },
+      "domains": {
+        "title": "Choose a type for each output",
+        "description": "Pick what each output actually is. The guess is based on the name \u2014 correct any that are wrong. Lights become light entities, fans become fans, everything else stays a switch."
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not reach the Waymote bridge at that address.",
+      "invalid_response": "That address answered, but it does not look like a Waymote bridge.",
+      "write_failed": "Could not save the names to the Waymote bridge. Check it is still reachable and try again."
+    },
+    "abort": {
+      "already_configured": "This Waymote bridge is already set up.",
+      "reconfigure_successful": "Waymote settings updated.",
+      "reconfigure_failed": "Could not update the Waymote configuration."
+    }
+  }
+}

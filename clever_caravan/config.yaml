@@ -1,5 +1,5 @@
 name: Clever Caravan
-version: "0.3.3"
+version: "0.3.4"
 slug: clever_caravan
 description: Installs and keeps Clever Caravan integrations up to date on this rig.
 url: https://github.com/sambarlick/clever_caravan_app
@@ -19,10 +19,12 @@ options:
   location: false
   waymote: false
   power: false
+  dashboard: false
   check_interval_minutes: 5
 schema:
   tpms: bool
   location: bool
   waymote: bool
   power: bool
+  dashboard: bool
   check_interval_minutes: int(1,1440)

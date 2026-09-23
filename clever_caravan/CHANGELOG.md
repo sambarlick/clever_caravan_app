@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.3.4
+- Added Clever Caravan: Dashboard 0.1.18.
+
 ## 0.3.3
 - Added Clever Caravan: Power 0.4.0.
 

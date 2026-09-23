@@ -1,0 +1,44 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Clever Caravan: Dashboard",
+        "description": "Adds the Clever Caravan dashboard. Create it from Settings > Dashboards > Add dashboard > Clever Caravan."
+      }
+    },
+    "abort": {
+      "already_configured": "Clever Caravan: Dashboard is already set up."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Dashboard settings",
+        "data": {
+          "tier": "Product tier",
+          "extra_platforms": "Extra integrations to include"
+        },
+        "data_description": {
+          "extra_platforms": "Clever Caravan integrations are always included. Ticked integrations are filtered by the product tier: Base allows Starlink, Premium and Kokoda allow the standard list, and Custom allows anything."
+        }
+      }
+    }
+  },
+  "selector": {
+    "tier": {
+      "options": {
+        "base": "Base",
+        "premium": "Premium",
+        "custom": "Custom",
+        "kokoda": "Kokoda"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "config": {
+        "name": "Config"
+      }
+    }
+  }
+}

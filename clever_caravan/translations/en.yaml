@@ -11,6 +11,9 @@ configuration:
   power:
     name: "Clever Caravan: Power"
     description: Battery, solar, inverter and tank monitoring for Victron systems.
+  dashboard:
+    name: "Clever Caravan: Dashboard"
+    description: The Clever Caravan dashboard and its cards.
   check_interval_minutes:
     name: Check interval (minutes)
     description: How often the App checks for integration changes.

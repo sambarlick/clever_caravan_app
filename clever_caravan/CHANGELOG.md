@@ -1,3 +1,9 @@
+## 0.4.4
+
+- Dashboard 0.1.19: four tiers (Base, Premium, Custom, Kokoda) with per-tier
+  integration gating, Kokoda colour scheme and logo, Shelly / Reolink / Dahua
+  support, cameras grouped into Security, DCX inverter moved to Power.
+
 # Changelog
 
 ## 0.4.3

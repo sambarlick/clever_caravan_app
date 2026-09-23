@@ -1,0 +1,112 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to your Victron GX device",
+        "description": "Enter the address of the Cerbo GX (or other Venus OS device). The portal ID is detected automatically.",
+        "data": {
+          "host": "Host",
+          "port": "Port",
+          "username": "Username (optional)",
+          "password": "Password (optional)",
+          "use_ssl": "Use SSL (port 8883)"
+        }
+      },
+      "relays": {
+        "title": "Name the Cerbo GX relays",
+        "description": "Give the two relays meaningful names for this install (e.g. Internal Fan, External Fan). You can change these later in Options.",
+        "data": {
+          "relay_0_name": "Relay 1 name",
+          "relay_1_name": "Relay 2 name"
+        }
+      },
+      "reconfigure": {
+        "title": "Update GX device connection",
+        "description": "Change the address or credentials of this GX device (e.g. if its IP address changed). The device identity must match the original.",
+        "data": {
+          "host": "Host",
+          "port": "Port",
+          "username": "Username (optional)",
+          "password": "Password (optional)",
+          "use_ssl": "Use SSL (port 8883)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not connect to the MQTT broker. Check the address and that MQTT is enabled on the GX device.",
+      "no_portal": "Connected, but no Venus portal was detected. Is this a Victron GX device?",
+      "different_device": "Connected, but that is a different GX device (portal ID mismatch). Add it as a new integration entry instead."
+    },
+    "abort": {
+      "already_configured": "This GX device is already configured.",
+      "reconfigure_successful": "Connection details updated."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Clever Caravan: Power options",
+        "menu_options": {
+          "tuning": "Tuning (limits, deadband, relay names)",
+          "ble": "Victron Bluetooth fallback"
+        }
+      },
+      "tuning": {
+        "title": "Clever Caravan: Power options",
+        "description": "Per-install tuning. The battery flow deadband sets how many watts count as \u201cIdle\u201d before the Battery Flow Direction sensor reports Charging or Discharging \u2014 raise it if the direction flickers at rest.",
+        "data": {
+          "current_limit_min": "Input current limit \u2014 minimum (A)",
+          "current_limit_max": "Input current limit \u2014 maximum (A)",
+          "flow_deadband": "Battery flow deadband (\u00b1W)",
+          "ssh_key_path": "SSH private key path (for Reboot SSH button)",
+          "relay_0_name": "Relay 1 name",
+          "relay_1_name": "Relay 2 name"
+        }
+      },
+      "ble": {
+        "title": "Victron Bluetooth fallback",
+        "description": "Paste the Instant Readout encryption key for each discovered Victron device to add it as an offline fallback. When MQTT is available it stays primary; if the Cerbo or network drops, these devices keep the battery, solar and DC-DC readings alive over Bluetooth. Get each key from the VictronConnect app: device \u2192 Settings \u2192 Product info \u2192 \u201cShow\u201d under Instant readout via Bluetooth.\n\n{summary}",
+        "data": {
+          "remove": "Remove configured devices",
+          "unignore": "Un-ignore devices (start nagging about them again)",
+          "ble_discovery": "Bluetooth discovery (turn off once this rig's devices are added)",
+          "clear_ignored": "Clear the whole ignored list"
+        },
+        "data_description": {
+          "ble_discovery": "When off, other caravans' Victron devices are never flagged, and existing discovery issues and the ignored list are cleared."
+        }
+      }
+    },
+    "error": {
+      "invalid_key": "That key isn't valid. A Victron advertisement key is exactly 32 hexadecimal characters (16 bytes). Copy the whole key from VictronConnect and try again."
+    }
+  },
+  "issues": {
+    "ble_unkeyed": {
+      "title": "Victron {kind} found over Bluetooth",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Victron {kind} found over Bluetooth",
+            "description": "A Victron {kind} ({address}) is advertising over Bluetooth but has no key configured. Add its key to use it as an offline fallback, or ignore it if you don't want it.",
+            "menu_options": {
+              "add_key": "Add its Bluetooth key",
+              "ignore": "Ignore this device",
+              "stop_discovery": "Stop Bluetooth discovery (clears all of these)"
+            }
+          },
+          "add_key": {
+            "title": "Add Bluetooth fallback key",
+            "description": "Paste the Instant Readout encryption key for the Victron {kind} ({address}). Get it from VictronConnect: device \u2192 Settings \u2192 Product info \u2192 \u201cShow\u201d under Instant readout via Bluetooth. Leave blank and submit to go back.",
+            "data": {
+              "key": "Advertisement key"
+            }
+          }
+        },
+        "error": {
+          "invalid_key": "That key isn't valid. A Victron advertisement key is exactly 32 hexadecimal characters (16 bytes). Copy the whole key from VictronConnect and try again."
+        }
+      }
+    }
+  }
+}

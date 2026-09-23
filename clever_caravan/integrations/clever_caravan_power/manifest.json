@@ -1,0 +1,13 @@
+{
+  "domain": "clever_caravan_power",
+  "name": "Clever Caravan: Power",
+  "codeowners": ["@sambarlick"],
+  "config_flow": true,
+  "dependencies": ["bluetooth"],
+  "documentation": "https://github.com/sambarlick/clever_caravan_integrations/tree/main/custom_components/clever_caravan_power",
+  "integration_type": "hub",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/sambarlick/clever_caravan_integrations/issues",
+  "requirements": ["paho-mqtt>=1.6.1", "victron-ble==0.9.3"],
+  "version": "0.4.0"
+}

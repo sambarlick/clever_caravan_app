@@ -8,6 +8,9 @@ configuration:
   waymote:
     name: "Clever Caravan: Waymote"
     description: Control and monitoring for the Waymote CAN-bus bridge.
+  power:
+    name: "Clever Caravan: Power"
+    description: Battery, solar, inverter and tank monitoring for Victron systems.
   check_interval_minutes:
     name: Check interval (minutes)
     description: How often the App checks for integration changes.

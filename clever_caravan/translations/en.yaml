@@ -14,6 +14,9 @@ configuration:
   dashboard:
     name: "Clever Caravan: Dashboard"
     description: The Clever Caravan dashboard and its cards.
+  weather:
+    name: "Clever Caravan: Weather"
+    description: Bureau of Meteorology forecasts that follow the van as it moves.
   check_interval_minutes:
     name: Check interval (minutes)
     description: How often the App checks for integration changes.

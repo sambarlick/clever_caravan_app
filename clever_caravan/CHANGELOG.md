@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.3.5
+- Added Clever Caravan: Weather 0.4.2. All integrations are now bundled.
+
 ## 0.3.4
 - Added Clever Caravan: Dashboard 0.1.18.
 

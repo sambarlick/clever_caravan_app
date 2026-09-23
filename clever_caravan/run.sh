@@ -37,6 +37,7 @@ while true; do
   sync_integration waymote clever_caravan_waymote
   sync_integration power clever_caravan_power
   sync_integration dashboard clever_caravan_dashboard
+  sync_integration weather clever_caravan_weather
 
   if $changed; then
     bashio::log.info "Changes made. Restarting Home Assistant."

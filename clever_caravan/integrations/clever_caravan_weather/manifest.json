@@ -1,0 +1,16 @@
+{
+  "domain": "clever_caravan_weather",
+  "name": "Clever Caravan: Weather",
+  "version": "0.4.2",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "config_flow": true,
+  "documentation": "https://github.com/sambarlick/clever_caravan_integrations/tree/main/custom_components/clever_caravan_weather",
+  "issue_tracker": "https://github.com/sambarlick/clever_caravan_integrations/issues",
+  "codeowners": [
+    "@sambarlick"
+  ],
+  "requirements": [
+    "iso8601"
+  ]
+}

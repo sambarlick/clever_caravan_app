@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.4.2
+- Store reload is now logged, with time allowed for it to finish.
+
 ## 0.4.1
 - Test release, no functional changes.
 

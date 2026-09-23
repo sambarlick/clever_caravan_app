@@ -19,9 +19,17 @@ in_window() {
 
 self_update() {
   local current latest
-  curl -sSf -X POST -H "$AUTH" "$SUPERVISOR/store/reload" > /dev/null 2>&1
-  current=$(curl -sSf -H "$AUTH" "$SUPERVISOR/addons/self/info" | jq -r .data.version)
-  latest=$(curl -sSf -H "$AUTH" "$SUPERVISOR/addons/self/info" | jq -r .data.version_latest)
+  if curl -sSf -X POST -H "$AUTH" "$SUPERVISOR/store/reload" > /dev/null; then
+    bashio::log.info "Store reloaded."
+  else
+    bashio::log.warning "Store reload failed."
+  fi
+  sleep 30
+  local info
+  info=$(curl -sSf -H "$AUTH" "$SUPERVISOR/addons/self/info")
+  current=$(echo "$info" | jq -r .data.version)
+  latest=$(echo "$info" | jq -r .data.version_latest)
+  bashio::log.info "App version ${current}, latest ${latest}."
   if [ -n "$latest" ] && [ "$latest" != "null" ] && [ "$current" != "$latest" ]; then
     bashio::log.info "App update available: $current -> $latest. Updating."
     if curl -sSf -X POST -H "$AUTH" "$SUPERVISOR/store/addons/self/update" > /dev/null; then

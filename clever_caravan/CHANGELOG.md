@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.4.1
+- Test release, no functional changes.
+
 ## 0.4.0
 - The App now updates itself, so releases no longer need to be installed by hand.
 - Updates and restarts happen in a configurable window, 02:00 by default.

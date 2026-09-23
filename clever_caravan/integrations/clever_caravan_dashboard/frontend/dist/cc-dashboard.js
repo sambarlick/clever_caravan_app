@@ -34,8 +34,12 @@ const ORDER = ["power", "water", "climate", "lights", "controls", "location", "t
 // Tier gating: which third-party integrations each tier may show.
 // "custom" allows anything ticked in the integration's settings.
 const TIER_PREMIUM_PLATFORMS = [
-  "starlink", "shelly", "reolink", "mopeka", "bluetti",
-  "teltonika", "teltonika_rutx", "glinet", "gl_inet", "unifi", "unifiprotect",
+  // Comms
+  "starlink", "teltonika", "teltonika_rutx", "glinet", "gl_inet", "unifi", "unifiprotect",
+  // Lights, switches, sensors
+  "shelly", "mopeka", "bluetti",
+  // Cameras
+  "reolink", "dahua", "amcrest", "frigate",
 ];
 const TIER_ALLOW = {
   base: ["starlink"],
@@ -770,7 +774,11 @@ function labelCategory(e) {
   return undefined;
 }
 
+// Devices that own a camera entity: everything on them belongs to Security.
+let CAMERA_DEVICES = new Set();
+
 function classify(hass, e) {
+  if (e.device_id && CAMERA_DEVICES.has(e.device_id)) return "security";
   const fromLabel = labelCategory(e);
   if (fromLabel !== undefined) return fromLabel;
   const st = hass.states[e.entity_id];
@@ -952,8 +960,13 @@ function buildOverview(hass, cats, all, nav) {
 
   const wx = all.filter((e) => e.platform === P_WX);
   const temps = all.filter((e) => domainOf(e.entity_id) === "sensor" && hass.states[e.entity_id].attributes.device_class === "temperature");
-  const inside = first(all.filter((e) => hasLabel(e, "cc_inside_temp"))) ||
-    first(temps.filter((e) => e.platform !== P_WX && e.platform !== P_TPMS && /inside|indoor|internal/.test(textOf(hass, e)) && !/fridge|freezer|cabinet/.test(textOf(hass, e))));
+  const indoorish = (e) =>
+    e.platform !== P_WX && e.platform !== P_TPMS && e.platform !== P_POWER &&
+    !/fridge|freezer|cabinet|battery|outside|outdoor|external|ambient|tyre|tpms|heat ?sink|dew/.test(textOf(hass, e));
+  const inside =
+    first(all.filter((e) => hasLabel(e, "cc_inside_temp"))) ||
+    first(temps.filter((e) => indoorish(e) && /inside|indoor|internal|caravan|van|lounge|bed/.test(textOf(hass, e)))) ||
+    first(temps.filter(indoorish)); // any remaining room sensor (Shelly H&T etc.)
   const outside = first(all.filter((e) => hasLabel(e, "cc_outside_temp"))) || uidEnds(wx, P_WX, "_temp");
   const ac = first(byDomain(cats.get("climate") || [], "climate"));
   if (wx.length || inside || outside || ac) {
@@ -1017,7 +1030,8 @@ function buildOverview(hass, cats, all, nav) {
     security_nav: nav("security"),
     tyres_nav: nav("tyres"),
   };
-  if (status.caravan || status.location || status.internet || status.fridge || status.tyres.length) panels.status = status;
+  if (status.caravan || status.location || status.internet || status.fridge || status.tyres.length ||
+      status.location_nav || status.security_nav || status.tyres_nav) panels.status = status;
 
   const weather = all.find((e) => e.platform === P_WX && domainOf(e.entity_id) === "weather" && !/hourly/.test(e.unique_id || ""))?.entity_id ||
     Object.keys(hass.states).find((id) => id.startsWith("weather."));
@@ -1044,7 +1058,8 @@ function buildGroups(hass, cat, list) {
     if (d === "device_tracker" || d === "weather") continue;
     const t = textOf(hass, e);
     let g;
-    if (cat === "lights") g = OUTSIDE_LIGHT_RE.test(t) || /outside|outdoor|exterior/i.test(areaName(hass, e)) ? "Outside" : "Inside";
+    if (cat === "security") g = d === "camera" ? "Cameras" : deviceName(hass, e.device_id) || "Security";
+    else if (cat === "lights") g = OUTSIDE_LIGHT_RE.test(t) || /outside|outdoor|exterior/i.test(areaName(hass, e)) ? "Outside" : "Inside";
     else if (cat === "tyres") g = (t.match(/(front|rear)[ _](left|right)/) || [])[0]?.replace("_", " ") || deviceName(hass, e.device_id) || "Tyres";
     else if (cat === "location") g = /gps|satellite|hdop|accuracy|fix|latitude|longitude|atomic|speed|climb|bearing|heading|elevation|gradient/.test(t) ? "GPS" : /climate|rainfall/.test(t) ? "Climate this month" : /population|statistical|wikipedia/.test(t) ? "About this place" : "Where you are";
     else if (cat === "climate" && e.platform === P_WX) g = /short_text|uv_|fire_danger/.test(e.unique_id || "") ? "Forecast" : "Now";
@@ -1076,6 +1091,10 @@ class CleverCaravanStrategy {
     const allow = TIER_ALLOW[tier];
     const extras = allow ? picked.filter((p) => allow.includes(p)) : picked; // no list = custom
     const platforms = new Set([...OWNED_PLATFORMS, ...extras]);
+
+    CAMERA_DEVICES = new Set(
+      registry.filter((e) => domainOf(e.entity_id) === "camera" && e.device_id).map((e) => e.device_id)
+    );
 
     const cats = new Map();
     const all = [];

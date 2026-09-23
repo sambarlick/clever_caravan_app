@@ -1,9 +1,9 @@
 {
   "domain": "clever_caravan_dashboard",
   "name": "Clever Caravan: Dashboard",
-  "version": "0.1.18",
-  "documentation": "https://github.com/sambarlick/clever_caravan_integrations/tree/main/custom_components/clever_caravan_dashboard",
-  "issue_tracker": "https://github.com/sambarlick/clever_caravan_integrations/issues",
+  "version": "0.1.19",
+  "documentation": "https://github.com/sambarlick/clever_caravan_dashboard",
+  "issue_tracker": "https://github.com/sambarlick/clever_caravan_dashboard/issues",
   "codeowners": [
     "@sambarlick"
   ],

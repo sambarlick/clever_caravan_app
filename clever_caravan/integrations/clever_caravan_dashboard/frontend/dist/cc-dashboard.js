@@ -277,6 +277,15 @@ const OV_CSS = `
 .rd{flex:1;display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(min(130px,100%),1fr));grid-auto-rows:minmax(64px,1fr)}
 .v .n{font-size:clamp(20px,min(9cqh,25cqi),52px)}
 .v.txt .n{font-size:clamp(16px,min(6cqh,15cqi),30px)}
+.seg{background:rgba(255,255,255,.04);border-radius:14px;padding:8px 10px;flex:none}
+.seg .l{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.seg .opts{display:grid;gap:6px;grid-template-columns:repeat(auto-fit,minmax(min(70px,100%),1fr))}
+.seg .opt{min-height:52px;border-radius:10px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.04);color:#cbd5e0;font:inherit;font-size:11px;font-weight:700;
+ letter-spacing:.03em;text-transform:uppercase;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:4px 2px;min-width:0}
+.seg .opt span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.seg .opt ha-icon{--mdc-icon-size:20px}
+.seg .opt.on{background:rgba(var(--rgb),.3);border:2px solid var(--c);color:var(--c);box-shadow:0 0 12px rgba(var(--rgb),.4)}
+.seg .opt:active{transform:scale(.97)}
 .bt{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(min(84px,100%),1fr));flex:none}
 .bt .b{min-height:clamp(56px,14cqh,84px)}
 .bt .b ha-icon{--mdc-icon-size:clamp(22px,7cqh,32px)}
@@ -331,7 +340,7 @@ class CcOverview extends CcBase {
     return L.filter((l) => which === "all" || (which === "outside") === !!l.outside).map((l) => l.id);
   }
 
-  _panel(key, readouts, buttons, { alarm = false, fillButtons = false } = {}) {
+  _panel(key, readouts, buttons, { alarm = false, fillButtons = false, pinned = "" } = {}) {
     if (!readouts.length && !buttons.length) return "";
     const s = CATS[key];
     const nav = this._config.panels[key]?.nav || "";
@@ -355,6 +364,7 @@ class CcOverview extends CcBase {
     }
     return `<div class="p ${alarm ? "alarm" : ""}" data-key="${key}" data-buttons="${total}" style="--c:${s.c};--rgb:${s.rgb}">
       <div class="ph" data-act="nav:${esc(nav)}"><div class="ic"><ha-icon icon="${s.icon}"></ha-icon></div><div class="t">${s.title}</div>${nav ? '<ha-icon class="go" icon="mdi:chevron-right"></ha-icon>' : ""}</div>
+      ${pinned}
       ${readouts.length ? `<div class="rd">${readouts.join("")}</div>` : ""}
       ${buttons.length ? `<div class="bt ${fillButtons || !readouts.length ? "fill" : ""}">${buttons.join("")}</div>` : ""}
     </div>`;
@@ -405,18 +415,20 @@ class CcOverview extends CcBase {
     });
     }
     const b = [];
+    let pinned = "";
     const inv = this._st(p.inverter);
     if (inv) {
       const icons = [[/charger/i, "mdi:battery-charging"], [/inverter/i, "mdi:transmission-tower"], [/off/i, "mdi:power"], [/on/i, "mdi:lightning-bolt"]];
-      for (const opt of inv.attributes.options || []) {
+      const opts = (inv.attributes.options || []).map((opt) => {
         const icon = (icons.find(([re]) => re.test(opt)) || [0, "mdi:circle-outline"])[1];
-        b.push(this._button(opt.replace(/\s*only$/i, ""), icon, `select:${p.inverter}:${opt}`, inv.state === opt));
-      }
+        return `<button class="opt ${inv.state === opt ? "on" : ""}" data-act="select:${p.inverter}:${esc(opt)}"><ha-icon icon="${icon}"></ha-icon><span>${esc(opt.replace(/\s*only$/i, ""))}</span></button>`;
+      });
+      if (opts.length) pinned = `<div class="seg"><div class="l">Inverter · ${esc(inv.state)}</div><div class="opts">${opts.join("")}</div></div>`;
     }
     if (p.inverter_switch) b.push(this._button("Inverter", "mdi:power", `toggle:${p.inverter_switch}`, this._on(p.inverter_switch))); // TEMP-DCX
     const alarm = (p.alarms || []).some((id) => this._on(id)) ||
       (p.alarm_sensors || []).some((id) => { const s = this._st(id)?.state; return s && !/^(no alarm|ok|unknown|unavailable)$/i.test(s); });
-    return this._panel("power", r, b, { alarm });
+    return this._panel("power", r, b, { alarm, pinned });
   }
 
   _water(p) {
@@ -569,9 +581,12 @@ class CcOverview extends CcBase {
     if (p.tyres_nav) b.push(this._button("Tyres", "mdi:car-tire-alert", `nav:${p.tyres_nav}`, false, t && t.state === "bad" ? "alert" : ""));
 
     if (this._compact) {
-      // Two tiles: Caravan + Location, unless an alert needs the space.
+      // Two tiles (Caravan + Location, or an alert), with Tyres/Security as buttons.
       const alert = (t && t.state === "bad" && tyres) || (fridgeBad && fridge) || (!netOn && internet) || "";
-      return this._panel("status", [caravan, alert || location].filter(Boolean), b);
+      const cb = [];
+      if (p.tyres_nav) cb.push(this._button("Tyres", "mdi:car-tire-alert", `nav:${p.tyres_nav}`, false, t && t.state === "bad" ? "alert" : ""));
+      if (p.security_nav) cb.push(this._button("Security", "mdi:cctv", `nav:${p.security_nav}`));
+      return this._panel("status", [caravan, alert || location].filter(Boolean), cb);
     }
     return this._panel("status", [caravan, location, gps, internet, fridge, tyres].filter(Boolean), b);
   }

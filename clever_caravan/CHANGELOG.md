@@ -1,3 +1,6 @@
+## 0.4.10
+- Dashboard 0.1.25: no UI rebuild when the registry changes but the dashboard does not
+
 ## 0.4.9
 - Dashboard 0.1.24: no visible re-fit when the dashboard is rebuilt or revisited; Hot Water name fix
 

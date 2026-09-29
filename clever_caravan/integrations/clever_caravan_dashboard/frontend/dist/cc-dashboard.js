@@ -1162,8 +1162,24 @@ function messageDashboard(message) {
   return { title: "Clever Caravan", views: [{ title: "Clever Caravan", icon: "mdi:caravan", cards: [{ type: "markdown", content: message }] }] };
 }
 
+// HA regenerates strategy dashboards whenever the entity/device/area registry
+// changes. Returning the *same object* when nothing we render has changed lets
+// HA skip rebuilding the view, so registry churn no longer flashes the UI.
+let LAST_DASH = null;
+let LAST_DASH_JSON = "";
+
 class CleverCaravanStrategy {
   static async generate(config, hass) {
+    const dash = await CleverCaravanStrategy._generate(config, hass);
+    const json = JSON.stringify(dash);
+    if (LAST_DASH && json === LAST_DASH_JSON) return LAST_DASH;
+    console.info(`Clever Caravan: dashboard ${LAST_DASH ? "changed, rebuilding" : "generated"} at ${new Date().toLocaleTimeString()}`);
+    LAST_DASH = dash;
+    LAST_DASH_JSON = json;
+    return dash;
+  }
+
+  static async _generate(config, hass) {
     let registry;
     try {
       registry = await hass.callWS({ type: "config/entity_registry/list" });

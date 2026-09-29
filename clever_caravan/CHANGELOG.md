@@ -1,3 +1,6 @@
+## 0.4.11
+- Dashboard 0.1.26: dashboard only rebuilds when its entities, labels or settings change (not on every registry update)
+
 ## 0.4.10
 - Dashboard 0.1.25: no UI rebuild when the registry changes but the dashboard does not
 

@@ -1168,7 +1168,31 @@ function messageDashboard(message) {
 let LAST_DASH = null;
 let LAST_DASH_JSON = "";
 
+// Signature of what the dashboard is built from. HA's default is to regenerate
+// on ANY registry change (every entity/device/area update on the unit), which
+// visibly rebuilds the view. We only regenerate when this signature changes.
+const SIG_CACHE = new WeakMap();
+function registrySig(hass) {
+  const ents = hass?.entities;
+  if (!ents) return "";
+  let sig = SIG_CACHE.get(ents);
+  if (sig === undefined) {
+    sig = Object.values(ents)
+      .map((e) => `${e.entity_id}|${e.platform}|${(e.labels || []).join(",")}|${e.hidden ? 1 : 0}|${e.entity_category || ""}|${e.name || ""}`)
+      .sort()
+      .join("\n");
+    SIG_CACHE.set(ents, sig);
+  }
+  const cfgId = Object.values(ents).find((e) => e.platform === "clever_caravan_dashboard" && e.entity_id.startsWith("sensor."))?.entity_id;
+  const cfg = JSON.stringify(hass.states?.[cfgId]?.attributes || {});
+  return `${sig}#${cfg}`;
+}
+
 class CleverCaravanStrategy {
+  static shouldRegenerate(config, oldHass, newHass) {
+    return registrySig(oldHass) !== registrySig(newHass);
+  }
+
   static async generate(config, hass) {
     const dash = await CleverCaravanStrategy._generate(config, hass);
     const json = JSON.stringify(dash);

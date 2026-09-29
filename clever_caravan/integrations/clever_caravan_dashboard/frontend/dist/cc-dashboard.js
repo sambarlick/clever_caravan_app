@@ -317,16 +317,32 @@ const OV_CSS = `
 @container host (max-width:380px){.hello{font-size:16px}}
 `;
 
+// Fitted layouts survive card re-creation (HA regenerates the dashboard on
+// registry changes, and re-attaches cards on navigation), so a rebuilt card
+// renders straight into its fitted shape instead of visibly re-trimming.
+const FIT_CACHE = new Map();
+
 class CcOverview extends CcBase {
   getCardSize() { return 12; }
+  _sizeKey() { return `${this.clientWidth}x${this.clientHeight}`; }
+  _loadFit() {
+    const f = FIT_CACHE.get(this._sizeKey());
+    this._caps = f ? { ...f.caps } : {};
+    this._rcaps = f ? { ...f.rcaps } : {};
+    this._sigs = f ? { ...f.sigs } : {};
+    this._fitKey = this._sizeKey();
+  }
   connectedCallback() {
-    this._caps = {};
-    this._sigs = {};
+    this._loadFit();
     this._timer = setInterval(() => this._render(), 30000);
     if (window.ResizeObserver && !this._ro) {
       this._ro = new ResizeObserver(() => {
         cancelAnimationFrame(this._roFrame);
-        this._roFrame = requestAnimationFrame(() => { this._caps = {}; this._rcaps = {}; this._render(); });
+        this._roFrame = requestAnimationFrame(() => {
+          if (this._sizeKey() === this._fitKey) return; // no real size change
+          this._loadFit();
+          this._render();
+        });
       });
     }
     this._ro?.observe(this);
@@ -359,6 +375,10 @@ class CcOverview extends CcBase {
       changed = true;
     }
     if (changed) this._render();
+    else if (this.clientWidth) {
+      FIT_CACHE.set(this._sizeKey(), { caps: { ...this._caps }, rcaps: { ...this._rcaps }, sigs: { ...this._sigs } });
+      this._fitKey = this._sizeKey();
+    }
   }
 
   _groupIds(which) {
@@ -905,10 +925,11 @@ function tankLabel(key) {
 
 function cleanName(hass, e) {
   const dev = deviceName(hass, e.device_id);
-  let n = friendly(hass, e.entity_id);
-  if (dev && n.startsWith(dev)) n = n.slice(dev.length);
-  n = n.replace(/^waymote( can bus)?\s*/i, "").replace(/\s+switch(\s*\d+)?$/i, "").trim();
-  return n || friendly(hass, e.entity_id);
+  const tidy = (x) => x.replace(/^waymote( can bus)?\s*/i, "").replace(/(^|\s+)switch(\s*\d+)?$/i, "").trim();
+  const full = tidy(friendly(hass, e.entity_id));
+  // Drop the device prefix only when something meaningful is left ("Hot Water Switch 0" stays "Hot Water").
+  const short = dev && full.startsWith(dev) ? tidy(full.slice(dev.length)) : "";
+  return short || full || friendly(hass, e.entity_id);
 }
 
 function friendly(hass, id) {

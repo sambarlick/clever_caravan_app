@@ -1,3 +1,6 @@
+## 0.4.9
+- Dashboard 0.1.24: no visible re-fit when the dashboard is rebuilt or revisited; Hot Water name fix
+
 ## 0.4.8
 - Dashboard 0.1.23: inside temperature ignores sensors without a reading and outside/fridge/equipment sensors
 

@@ -1,4 +1,7 @@
 ## 0.4.5
+- Dashboard 0.1.21: tiers auto-include integrations; inverter dropdown on phones; panels no longer overflow; DCX on all tiers
+
+## 0.4.5
 - Dashboard 0.1.20: single pinned Inverter mode tile; Tyres/Security buttons on phone layout
 
 # Changelog

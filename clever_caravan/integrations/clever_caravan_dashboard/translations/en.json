@@ -16,10 +16,10 @@
         "title": "Dashboard settings",
         "data": {
           "tier": "Product tier",
-          "extra_platforms": "Extra integrations to include"
+          "extra_platforms": "Extra integrations (Custom tier only)"
         },
         "data_description": {
-          "extra_platforms": "Clever Caravan integrations are always included. Ticked integrations are filtered by the product tier: Base allows Starlink, Premium and Kokoda allow the standard list, and Custom allows anything."
+          "extra_platforms": "Clever Caravan integrations are always included. Base adds Starlink; Premium and Kokoda add the standard list automatically. Ticks only apply on Custom (Premium plus anything ticked)."
         }
       }
     }

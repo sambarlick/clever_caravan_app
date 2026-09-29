@@ -9,6 +9,7 @@ Band-aids that must be removed once the proper fix lands. Search the code for th
 - **What:** Overview Power panel reads Client X's DCX Inverter directly from its
   MQTT discovery entities (unique IDs `ozxcorp_dcx_*`), and keeps the DCX relay
   switch out of Controls. The DCX Battery (BMS) device is ignored (currently dead).
+  Since v0.1.21 `ozxcorp_dcx_*` entities are included on every tier (no need to tick MQTT).
 - **Why temporary:** hardware knowledge belongs in `clever_caravan_power`, not the
   dashboard. The dashboard should only read Clever Caravan's standard keys.
 - **Proper fix:** add a DCX backend to `clever_caravan_power` that publishes the

@@ -31,8 +31,8 @@ const CATS = {
 };
 const ORDER = ["power", "water", "climate", "lights", "controls", "location", "tyres", "security", "more"];
 
-// Tier gating: which third-party integrations each tier may show.
-// "custom" allows anything ticked in the integration's settings.
+// Tier gating: third-party integrations each tier includes automatically
+// (when installed). Custom = Premium + anything ticked in the settings.
 const TIER_PREMIUM_PLATFORMS = [
   // Comms
   "starlink", "teltonika", "teltonika_rutx", "glinet", "gl_inet", "unifi", "unifiprotect",
@@ -41,9 +41,10 @@ const TIER_PREMIUM_PLATFORMS = [
   // Cameras
   "reolink", "dahua", "amcrest", "frigate",
 ];
-const TIER_ALLOW = {
+const TIER_AUTO = {
   base: ["starlink"],
   premium: TIER_PREMIUM_PLATFORMS,
+  custom: TIER_PREMIUM_PLATFORMS,
   kokoda: TIER_PREMIUM_PLATFORMS,
 };
 
@@ -69,7 +70,7 @@ const BASE_CSS = `
 :host{box-sizing:border-box;--bg:#111118;--panel:#1b1f2b;--ink:#f0f0f5;--mute:#a0aec0;display:block;color:var(--ink);font-family:var(--ha-font-family-body,Roboto,sans-serif);background:var(--bg)}
 *{box-sizing:border-box}
 ha-icon{display:inline-flex}
-.v{background:rgba(255,255,255,.04);border-radius:12px;padding:8px 12px;min-width:0;display:flex;flex-direction:column;justify-content:center}
+.v{background:rgba(255,255,255,.04);border-radius:12px;padding:6px 12px;min-width:0;display:flex;flex-direction:column;justify-content:center}
 .v .l{font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .v .n{font-weight:700;line-height:1.15;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .v .s{font-size:14px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -78,7 +79,7 @@ ha-icon{display:inline-flex}
 .v.tap{cursor:pointer;border:2px solid transparent;transition:all .2s}.v.tap:active{transform:scale(.97)}
 .v.sel{border-color:var(--c);background:rgba(var(--rgb),.18);box-shadow:0 0 16px rgba(var(--rgb),.45)}.v.sel .l,.v.sel .s{color:var(--c)}
 .v.good .n{color:#48bb78}.v.warn .n{color:#ed8936}.v.bad .n{color:#fc8181}.v.dim{opacity:.45}
-.bar{height:8px;border-radius:4px;background:rgba(255,255,255,.08);overflow:hidden;margin-top:6px}.bar i{display:block;height:100%;border-radius:4px}
+.bar{height:6px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden;margin-top:4px}.bar i{display:block;height:100%;border-radius:4px}
 .b{min-height:56px;border-radius:14px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.04);color:#cbd5e0;
  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font:inherit;font-size:13px;font-weight:700;letter-spacing:.04em;
  text-transform:uppercase;cursor:pointer;padding:6px 4px;min-width:0;transition:all .2s;text-align:center;line-height:1.2}
@@ -146,6 +147,10 @@ class CcBase extends HTMLElement {
     if (!this.shadowRoot) {
       this.attachShadow({ mode: "open" });
       this.shadowRoot.addEventListener("click", (ev) => this._click(ev));
+      this.shadowRoot.addEventListener("change", (ev) => {
+        const el = ev.target;
+        if (el?.dataset?.sel) this._click({ composedPath: () => [{ dataset: { act: `select:${el.dataset.sel}:${el.value}` } }] });
+      });
     }
     if (this._hass) this._render();
   }
@@ -274,25 +279,39 @@ const OV_CSS = `
 .p.alarm .ph .ic{background:rgba(252,129,129,.3)}.p.alarm .ph .ic ha-icon{color:#fc8181}
 .ph .t{font-size:clamp(16px,5cqh,22px);font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--c)}
 .ph .go{margin-left:auto;color:var(--mute);--mdc-icon-size:28px}
-.rd{flex:1;display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(min(130px,100%),1fr));grid-auto-rows:minmax(64px,1fr)}
-.v .n{font-size:clamp(20px,min(9cqh,25cqi),52px)}
+.rd{flex:1;display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(min(130px,100%),1fr));grid-auto-rows:minmax(58px,1fr)}
+.v .n{font-size:clamp(20px,min(8cqh,22cqi),48px)}
 .v.txt .n{font-size:clamp(16px,min(6cqh,15cqi),30px)}
 .seg{background:rgba(255,255,255,.04);border-radius:14px;padding:8px 10px;flex:none}
 .seg .l{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .seg .opts{display:grid;gap:6px;grid-template-columns:repeat(auto-fit,minmax(min(70px,100%),1fr))}
-.seg .opt{min-height:52px;border-radius:10px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.04);color:#cbd5e0;font:inherit;font-size:11px;font-weight:700;
+.seg .opt{min-height:46px;border-radius:10px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.04);color:#cbd5e0;font:inherit;font-size:11px;font-weight:700;
  letter-spacing:.03em;text-transform:uppercase;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:4px 2px;min-width:0}
 .seg .opt span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .seg .opt ha-icon{--mdc-icon-size:20px}
 .seg .opt.on{background:rgba(var(--rgb),.3);border:2px solid var(--c);color:var(--c);box-shadow:0 0 12px rgba(var(--rgb),.4)}
 .seg .opt:active{transform:scale(.97)}
+.seg .dd{display:none;position:relative;align-items:center;gap:6px;min-height:52px}
+.seg .dd .dv{flex:1;min-width:0}.seg .dd .dv .l{margin:0}
+.seg .dd .n{font-size:clamp(16px,8cqi,22px);font-weight:700;color:var(--c);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.seg .dd ha-icon{color:var(--c);--mdc-icon-size:26px;flex:none}
+.seg .dd select{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:16px}
+@container (max-width:300px){.seg>.l,.seg .opts{display:none}.seg .dd{display:flex}.seg{border:2px solid rgba(var(--rgb),.35);background:rgba(var(--rgb),.1)}}
+.seg.tog{display:flex;align-items:center;gap:6px;min-height:60px;cursor:pointer;border:2px solid rgba(255,255,255,.08)}
+.seg.tog .dv{flex:1;min-width:0}.seg.tog .l{margin:0}
+.seg.tog .n{font-size:22px;font-weight:700;color:var(--mute)}.seg.tog ha-icon{--mdc-icon-size:28px;color:var(--mute)}
+.seg.tog.on{border-color:var(--c);background:rgba(var(--rgb),.2);box-shadow:0 0 14px rgba(var(--rgb),.4)}.seg.tog.on .n,.seg.tog.on ha-icon{color:var(--c)}
+.seg.tog:active{transform:scale(.98)}
+.ph .more{font-size:14px;font-weight:700;color:var(--mute);background:rgba(255,255,255,.06);border-radius:999px;padding:2px 10px;margin-left:auto}
+.ph .more+.go{margin-left:0}
+.bt.pair{grid-template-columns:1fr 1fr}.bt.pair .b{font-size:11px;letter-spacing:.02em}
 .bt{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(min(84px,100%),1fr));flex:none}
 .bt .b{min-height:clamp(56px,14cqh,84px)}
 .bt .b ha-icon{--mdc-icon-size:clamp(22px,7cqh,32px)}
 .bt.fill{flex:1;min-height:0;grid-auto-rows:minmax(56px,130px);align-content:safe center}
 @container host (max-width:1000px) and (min-width:601px){.grid{--cols:2}.chip.opt,.chip.person{display:none}}
 @container host (max-width:600px){:host{padding:8px}.grid{--cols:2;gap:8px}.wrap{gap:8px}.chip.opt,.chip.person{display:none}
- .p{padding:10px;gap:8px}.rd{grid-auto-rows:minmax(52px,1fr)}.rd .v:nth-child(n+3){display:none}
+ .p{padding:10px;gap:8px}.rd{grid-auto-rows:minmax(52px,1fr)}
  .ph .t{font-size:15px;letter-spacing:.04em}.ph .ic{width:32px;height:32px}.ph .go{--mdc-icon-size:22px}}
 @container host (max-width:380px){.hello{font-size:16px}}
 `;
@@ -306,7 +325,7 @@ class CcOverview extends CcBase {
     if (window.ResizeObserver && !this._ro) {
       this._ro = new ResizeObserver(() => {
         cancelAnimationFrame(this._roFrame);
-        this._roFrame = requestAnimationFrame(() => { this._caps = {}; this._render(); });
+        this._roFrame = requestAnimationFrame(() => { this._caps = {}; this._rcaps = {}; this._render(); });
       });
     }
     this._ro?.observe(this);
@@ -320,17 +339,23 @@ class CcOverview extends CcBase {
   _fit() {
     if (!this._root) return;
     let changed = false;
+    this._rcaps = this._rcaps || {};
     for (const p of this._root.querySelectorAll(".p[data-key]")) {
+      if (p.scrollHeight <= p.clientHeight + 1) continue;
       const key = p.dataset.key;
-      const total = Number(p.dataset.buttons) || 0;
-      if (!total) continue;
-      if (p.scrollHeight > p.clientHeight + 1) {
-        const cur = Math.min(this._caps[key] ?? total, total);
-        if (cur > 0) {
-          this._caps[key] = cur - 1;
-          changed = true;
-        }
-      }
+      const bt = Number(p.dataset.buttons) || 0;
+      const rt = Number(p.dataset.readouts) || 0;
+      const b = Math.min(this._caps[key] ?? bt, bt);
+      const r = Math.min(this._rcaps[key] ?? rt, rt);
+      // Drop readouts beyond 2, then buttons down to 1, then readouts down to 1.
+      const nav = p.querySelector(".ph .go");
+      if (r > 2) this._rcaps[key] = r - 1;
+      else if (b > 1) this._caps[key] = b - 1;
+      else if (b === 1 && r > 1 && nav) this._caps[key] = 0; // keep both readouts; buttons live in the subview
+      else if (r > 1) this._rcaps[key] = r - 1;
+      else if (b > 0 && r > 0) this._caps[key] = b - 1;
+      else continue;
+      changed = true;
     }
     if (changed) this._render();
   }
@@ -340,7 +365,7 @@ class CcOverview extends CcBase {
     return L.filter((l) => which === "all" || (which === "outside") === !!l.outside).map((l) => l.id);
   }
 
-  _panel(key, readouts, buttons, { alarm = false, fillButtons = false, pinned = "" } = {}) {
+  _panel(key, readouts, buttons, { alarm = false, fillButtons = false, pinned = "", pairButtons = false, keepLast = false } = {}) {
     if (!readouts.length && !buttons.length) return "";
     const s = CATS[key];
     const nav = this._config.panels[key]?.nav || "";
@@ -348,12 +373,21 @@ class CcOverview extends CcBase {
     this._caps = this._caps || {};
     this._sigs = this._sigs || {};
     const sig = `${readouts.length}:${buttons.length}`;
+    this._rcaps = this._rcaps || {};
     if (this._sigs[key] !== sig) {
       this._sigs[key] = sig;
       delete this._caps[key];
+      delete this._rcaps[key];
     }
+    const rtotal = readouts.length;
+    const rcap = this._rcaps[key] ?? Infinity;
+    const hidden = Math.max(0, rtotal - rcap);
+    // keepLast: the final readout (e.g. Grey tank) survives trimming.
+    if (hidden) readouts = keepLast && rcap > 1 ? [...readouts.slice(0, rcap - 1), readouts[rtotal - 1]] : readouts.slice(0, rcap);
     const cap = this._caps[key] ?? Infinity;
     const total = buttons.length;
+    let hiddenButtons = 0;
+    if (total > cap && cap === 0) hiddenButtons = total;
     if (total > cap) {
       if (nav && cap >= 1) {
         const keep = cap - 1;
@@ -362,11 +396,11 @@ class CcOverview extends CcBase {
         buttons = buttons.slice(0, Math.max(0, cap));
       }
     }
-    return `<div class="p ${alarm ? "alarm" : ""}" data-key="${key}" data-buttons="${total}" style="--c:${s.c};--rgb:${s.rgb}">
-      <div class="ph" data-act="nav:${esc(nav)}"><div class="ic"><ha-icon icon="${s.icon}"></ha-icon></div><div class="t">${s.title}</div>${nav ? '<ha-icon class="go" icon="mdi:chevron-right"></ha-icon>' : ""}</div>
+    return `<div class="p ${alarm ? "alarm" : ""}" data-key="${key}" data-buttons="${total}" data-readouts="${rtotal}" style="--c:${s.c};--rgb:${s.rgb}">
+      <div class="ph" data-act="nav:${esc(nav)}"><div class="ic"><ha-icon icon="${s.icon}"></ha-icon></div><div class="t">${s.title}</div>${(hidden + hiddenButtons) && nav ? `<span class="more">+${hidden + hiddenButtons}</span>` : ""}${nav ? '<ha-icon class="go" icon="mdi:chevron-right"></ha-icon>' : ""}</div>
       ${pinned}
       ${readouts.length ? `<div class="rd">${readouts.join("")}</div>` : ""}
-      ${buttons.length ? `<div class="bt ${fillButtons || !readouts.length ? "fill" : ""}">${buttons.join("")}</div>` : ""}
+      ${buttons.length ? `<div class="bt ${fillButtons || !readouts.length ? "fill" : ""}${pairButtons ? " pair" : ""}">${buttons.join("")}</div>` : ""}
     </div>`;
   }
 
@@ -423,9 +457,18 @@ class CcOverview extends CcBase {
         const icon = (icons.find(([re]) => re.test(opt)) || [0, "mdi:circle-outline"])[1];
         return `<button class="opt ${inv.state === opt ? "on" : ""}" data-act="select:${p.inverter}:${esc(opt)}"><ha-icon icon="${icon}"></ha-icon><span>${esc(opt.replace(/\s*only$/i, ""))}</span></button>`;
       });
-      if (opts.length) pinned = `<div class="seg"><div class="l">Inverter · ${esc(inv.state)}</div><div class="opts">${opts.join("")}</div></div>`;
+      if (opts.length) {
+        const list = (inv.attributes.options || []).map((o) => `<option value="${esc(o)}"${o === inv.state ? " selected" : ""}>${esc(o)}</option>`).join("");
+        pinned = `<div class="seg"><div class="l">Inverter · ${esc(inv.state)}</div><div class="opts">${opts.join("")}</div>
+          <div class="dd"><div class="dv"><div class="l">Inverter</div><div class="n">${esc(inv.state)}</div></div><ha-icon icon="mdi:chevron-down"></ha-icon>
+          <select data-sel="${esc(p.inverter)}" aria-label="Inverter mode">${list}</select></div></div>`;
+      }
     }
-    if (p.inverter_switch) b.push(this._button("Inverter", "mdi:power", `toggle:${p.inverter_switch}`, this._on(p.inverter_switch))); // TEMP-DCX
+    if (!pinned && p.inverter_switch) {
+      // On/off inverters (TEMP-DCX today): same pinned tile, tap to toggle.
+      const on = this._on(p.inverter_switch);
+      pinned = `<div class="seg tog${on ? " on" : ""}" data-act="toggle:${esc(p.inverter_switch)}"><div class="dv"><div class="l">Inverter</div><div class="n">${on ? "On" : "Off"}</div></div><ha-icon icon="mdi:power"></ha-icon></div>`;
+    }
     const alarm = (p.alarms || []).some((id) => this._on(id)) ||
       (p.alarm_sensors || []).some((id) => { const s = this._st(id)?.state; return s && !/^(no alarm|ok|unknown|unavailable)$/i.test(s); });
     return this._panel("power", r, b, { alarm, pinned });
@@ -436,17 +479,17 @@ class CcOverview extends CcBase {
     const r = (p.tanks || []).map((t) => {
       const n = this._num(t.level) ?? 0;
       const on = t.toggle ? this._on(t.toggle) : false;
-      const sub = [t.remaining ? this._fmt(t.remaining) : "", on ? "Selected" : ""].filter(Boolean).join(" · ");
-      return this._readout(t.label, this._fmt(t.level), {
+      // Litres ride in the label so a tank tile stays three lines tall; selection shows as a glow.
+      const label = t.remaining ? `${t.label} · ${this._fmt(t.remaining)}` : t.label;
+      return this._readout(label, this._fmt(t.level), {
         cls: on ? "sel" : "",
-        sub,
         bar: n,
         barColor: this._tankColour(n, t.grey),
         act: t.toggle ? `toggle:${t.toggle}` : "",
       });
     });
     const b = (p.buttons || []).map((x) => this._button(x.label, x.icon, `toggle:${x.id}`, this._on(x.id)));
-    return this._panel("water", r, b);
+    return this._panel("water", r, b, { keepLast: (p.tanks || []).some((t) => t.grey) });
   }
 
   _waterCompact(p) {
@@ -583,10 +626,13 @@ class CcOverview extends CcBase {
     if (this._compact) {
       // Two tiles (Caravan + Location, or an alert), with Tyres/Security as buttons.
       const alert = (t && t.state === "bad" && tyres) || (fridgeBad && fridge) || (!netOn && internet) || "";
+      const where = p.location
+        ? this._readout("Location", this._fmt(p.location), { cls: "txt", sub: p.caravan ? this._fmt(p.caravan) : "", act: p.location_nav ? `nav:${p.location_nav}` : "" })
+        : caravan;
       const cb = [];
       if (p.tyres_nav) cb.push(this._button("Tyres", "mdi:car-tire-alert", `nav:${p.tyres_nav}`, false, t && t.state === "bad" ? "alert" : ""));
       if (p.security_nav) cb.push(this._button("Security", "mdi:cctv", `nav:${p.security_nav}`));
-      return this._panel("status", [caravan, alert || location].filter(Boolean), cb);
+      return this._panel("status", [alert || where].filter(Boolean), cb, { pairButtons: cb.length === 2 });
     }
     return this._panel("status", [caravan, location, gps, internet, fridge, tyres].filter(Boolean), b);
   }
@@ -629,6 +675,10 @@ class CcOverview extends CcBase {
       this._root = this.shadowRoot.querySelector(".wrap");
     }
     patchHtml(this._root, `${this._top()}<div class="grid">${out.filter(Boolean).join("")}</div>`);
+    for (const sel of this._root.querySelectorAll("select[data-sel]")) {
+      const v = this._st(sel.dataset.sel)?.state;
+      if (v != null && sel.value !== v) sel.value = v;
+    }
     cancelAnimationFrame(this._fitFrame);
     this._fitFrame = requestAnimationFrame(() => this._fit());
   }
@@ -1103,9 +1153,9 @@ class CleverCaravanStrategy {
     const attrs = cfg.attributes;
     const tier = attrs.tier || "base";
     const picked = Array.isArray(attrs.extra_platforms) ? attrs.extra_platforms : [];
-    const allow = TIER_ALLOW[tier];
-    const extras = allow ? picked.filter((p) => allow.includes(p)) : picked; // no list = custom
-    const platforms = new Set([...OWNED_PLATFORMS, ...extras]);
+    const auto = TIER_AUTO[tier] || TIER_AUTO.base;
+    const platforms = new Set([...OWNED_PLATFORMS, ...auto, ...(tier === "custom" ? picked : [])]);
+    const owned = new Set(OWNED_PLATFORMS);
 
     CAMERA_DEVICES = new Set(
       registry.filter((e) => domainOf(e.entity_id) === "camera" && e.device_id).map((e) => e.device_id)
@@ -1116,7 +1166,10 @@ class CleverCaravanStrategy {
     for (const e of registry) {
       if (!isUsable(hass, e)) continue;
       const labelled = (e.labels || []).some((l) => l.startsWith(LABEL_PREFIX));
-      if (!platforms.has(e.platform) && !labelled) continue;
+      const dcxTemp = /^ozxcorp_dcx_/.test(e.unique_id || ""); // TEMP-DCX: always included, any tier
+      if (!platforms.has(e.platform) && !labelled && !dcxTemp) continue;
+      // Third-party device trackers (e.g. UniFi clients) would flood Location.
+      if (domainOf(e.entity_id) === "device_tracker" && !owned.has(e.platform) && !labelled) continue;
       const cat = classify(hass, e);
       if (!cat) continue;
       all.push(e);

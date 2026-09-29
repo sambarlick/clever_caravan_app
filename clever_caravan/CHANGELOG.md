@@ -1,4 +1,4 @@
-## 0.4.5
+## 0.4.6
 - Dashboard 0.1.21: tiers auto-include integrations; inverter dropdown on phones; panels no longer overflow; DCX on all tiers
 
 ## 0.4.5

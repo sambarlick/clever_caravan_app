@@ -1,3 +1,6 @@
+## 0.4.8
+- Dashboard 0.1.23: inside temperature ignores sensors without a reading and outside/fridge/equipment sensors
+
 ## 0.4.7
 - Dashboard 0.1.22: hide unavailable third-party entities; 3-column tanks; tidy Shelly names
 

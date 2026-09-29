@@ -1026,12 +1026,14 @@ function buildOverview(hass, cats, all, nav) {
 
   const wx = all.filter((e) => e.platform === P_WX);
   const temps = all.filter((e) => domainOf(e.entity_id) === "sensor" && hass.states[e.entity_id].attributes.device_class === "temperature");
+  const numeric = (e) => !isNaN(parseFloat(hass.states[e.entity_id]?.state));
   const indoorish = (e) =>
-    e.platform !== P_WX && e.platform !== P_TPMS && e.platform !== P_POWER &&
-    !/fridge|freezer|cabinet|battery|outside|outdoor|external|ambient|tyre|tpms|heat ?sink|dew/.test(textOf(hass, e));
+    e.platform !== P_WX && e.platform !== P_TPMS && e.platform !== P_POWER && numeric(e) &&
+    !/fridge|freezer|cabinet|battery|outside|outdoor|external|ambient|tyre|tpms|heat ?sink|dew|tempout|_out\b|\bout\b|mean|average|bms|inverter|router|modem|rut\d|starlink|cpu|camera|cam\b/.test(textOf(hass, e));
   const inside =
     first(all.filter((e) => hasLabel(e, "cc_inside_temp"))) ||
-    first(temps.filter((e) => indoorish(e) && /inside|indoor|internal|caravan|van|lounge|bed/.test(textOf(hass, e)))) ||
+    first(temps.filter((e) => indoorish(e) && /inside|indoor|internal/.test(textOf(hass, e)))) ||
+    first(temps.filter((e) => indoorish(e) && /caravan|lounge|bed|\bvan\b/.test(textOf(hass, e)))) ||
     first(temps.filter(indoorish)); // any remaining room sensor (Shelly H&T etc.)
   const outside = first(all.filter((e) => hasLabel(e, "cc_outside_temp"))) || uidEnds(wx, P_WX, "_temp");
   const ac = first(byDomain(cats.get("climate") || [], "climate"));

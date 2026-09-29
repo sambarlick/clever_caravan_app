@@ -281,6 +281,7 @@ const OV_CSS = `
 .ph .go{margin-left:auto;color:var(--mute);--mdc-icon-size:28px}
 .rd{flex:1;display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(min(130px,100%),1fr));grid-auto-rows:minmax(58px,1fr)}
 .v .n{font-size:clamp(20px,min(8cqh,22cqi),48px)}
+.rd.tanks{grid-template-columns:repeat(auto-fit,minmax(min(105px,100%),1fr))}
 .v.txt .n{font-size:clamp(16px,min(6cqh,15cqi),30px)}
 .seg{background:rgba(255,255,255,.04);border-radius:14px;padding:8px 10px;flex:none}
 .seg .l{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -399,7 +400,7 @@ class CcOverview extends CcBase {
     return `<div class="p ${alarm ? "alarm" : ""}" data-key="${key}" data-buttons="${total}" data-readouts="${rtotal}" style="--c:${s.c};--rgb:${s.rgb}">
       <div class="ph" data-act="nav:${esc(nav)}"><div class="ic"><ha-icon icon="${s.icon}"></ha-icon></div><div class="t">${s.title}</div>${(hidden + hiddenButtons) && nav ? `<span class="more">+${hidden + hiddenButtons}</span>` : ""}${nav ? '<ha-icon class="go" icon="mdi:chevron-right"></ha-icon>' : ""}</div>
       ${pinned}
-      ${readouts.length ? `<div class="rd">${readouts.join("")}</div>` : ""}
+      ${readouts.length ? `<div class="rd${key === "water" && !this._compact && rtotal > 4 ? " tanks" : ""}">${readouts.join("")}</div>` : ""}
       ${buttons.length ? `<div class="bt ${fillButtons || !readouts.length ? "fill" : ""}${pairButtons ? " pair" : ""}">${buttons.join("")}</div>` : ""}
     </div>`;
   }
@@ -906,7 +907,7 @@ function cleanName(hass, e) {
   const dev = deviceName(hass, e.device_id);
   let n = friendly(hass, e.entity_id);
   if (dev && n.startsWith(dev)) n = n.slice(dev.length);
-  n = n.replace(/^waymote( can bus)?\s*/i, "").trim();
+  n = n.replace(/^waymote( can bus)?\s*/i, "").replace(/\s+switch(\s*\d+)?$/i, "").trim();
   return n || friendly(hass, e.entity_id);
 }
 
@@ -1168,6 +1169,8 @@ class CleverCaravanStrategy {
       const labelled = (e.labels || []).some((l) => l.startsWith(LABEL_PREFIX));
       const dcxTemp = /^ozxcorp_dcx_/.test(e.unique_id || ""); // TEMP-DCX: always included, any tier
       if (!platforms.has(e.platform) && !labelled && !dcxTemp) continue;
+      // Dead third-party leftovers (old MQTT discovery, flat sensors) stay out.
+      if (!owned.has(e.platform) && !dcxTemp && hass.states[e.entity_id]?.state === "unavailable") continue;
       // Third-party device trackers (e.g. UniFi clients) would flood Location.
       if (domainOf(e.entity_id) === "device_tracker" && !owned.has(e.platform) && !labelled) continue;
       const cat = classify(hass, e);

@@ -26,3 +26,6 @@ configuration:
   update_window_hours:
     name: Update window length (hours)
     description: How long the update window stays open.
+  restart_now:
+    name: Restart immediately
+    description: Restart Home Assistant as soon as changes are made, ignoring the update window.

@@ -1,3 +1,6 @@
+## 0.4.20
+- Restarts can now be deferred to the update window; added a Restart immediately option, on by default
+
 ## 0.4.19
 - Waymote 0.6.1: combined devices survive reconfigure and can be managed from Configure
 - Dashboard 0.1.31: awning Out/Stop/In controls; White/Ambient for two-tone lights; camera lights and presets on Security

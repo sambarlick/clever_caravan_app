@@ -2,6 +2,8 @@
 SRC=/integrations
 DEST=/homeassistant/custom_components
 MARKER=.clever_caravan_app
+INSTALLED=/data/.installed
+PENDING=/data/.restart_pending
 SUPERVISOR=http://supervisor
 AUTH="Authorization: Bearer ${SUPERVISOR_TOKEN}"
 
@@ -75,8 +77,18 @@ sync_all() {
   sync_integration weather clever_caravan_weather
 
   if $changed; then
-    bashio::log.info "Changes made. Restarting Home Assistant."
-    curl -sSf -X POST -H "$AUTH" "$SUPERVISOR/core/restart" > /dev/null
+    touch "$PENDING"
+  fi
+
+  if [ -f "$PENDING" ]; then
+    if [ ! -f "$INSTALLED" ] || bashio::config.true 'restart_now' || in_window; then
+      bashio::log.info "Restarting Home Assistant."
+      curl -sSf -X POST -H "$AUTH" "$SUPERVISOR/core/restart" > /dev/null
+      rm -f "$PENDING"
+      touch "$INSTALLED"
+    else
+      bashio::log.info "Files staged. Restart deferred to the ${WINDOW_START} window."
+    fi
   fi
 }
 

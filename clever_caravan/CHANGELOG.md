@@ -1,3 +1,6 @@
+## 0.4.12
+- Dashboard 0.1.27: lights grouped by room on Overview and Lights page; brightness sliders for dimmable lights
+
 ## 0.4.11
 - Dashboard 0.1.26: dashboard only rebuilds when its entities, labels or settings change (not on every registry update)
 

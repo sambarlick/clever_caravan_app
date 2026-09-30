@@ -150,6 +150,7 @@ class CcBase extends HTMLElement {
       this.shadowRoot.addEventListener("change", (ev) => {
         const el = ev.target;
         if (el?.dataset?.sel) this._click({ composedPath: () => [{ dataset: { act: `select:${el.dataset.sel}:${el.value}` } }] });
+        if (el?.dataset?.bri) this._hass.callService("light", "turn_on", { entity_id: el.dataset.bri, brightness_pct: Number(el.value) });
       });
     }
     if (this._hass) this._render();
@@ -321,6 +322,7 @@ const OV_CSS = `
 // registry changes, and re-attaches cards on navigation), so a rebuilt card
 // renders straight into its fitted shape instead of visibly re-trimming.
 const FIT_CACHE = new Map();
+const ROOM_ICONS = { Bathroom: "mdi:shower-head", Bedroom: "mdi:bed", Kitchen: "mdi:countertop", Lounge: "mdi:sofa", Inside: "mdi:lamps" };
 
 class CcOverview extends CcBase {
   getCardSize() { return 12; }
@@ -366,6 +368,12 @@ class CcOverview extends CcBase {
       const r = Math.min(this._rcaps[key] ?? rt, rt);
       // Drop readouts beyond 2, then buttons down to 1, then readouts down to 1.
       const nav = p.querySelector(".ph .go");
+      if (key === "lights" && (this._caps.lights_mode || 0) < 2 && !this._compact) {
+        this._caps.lights_mode = (this._caps.lights_mode || 0) + 1;
+        delete this._caps.lights;
+        changed = true;
+        continue;
+      }
       if (r > 2) this._rcaps[key] = r - 1;
       else if (b > 1) this._caps[key] = b - 1;
       else if (b === 1 && r > 1 && nav) this._caps[key] = 0; // keep both readouts; buttons live in the subview
@@ -383,6 +391,7 @@ class CcOverview extends CcBase {
 
   _groupIds(which) {
     const L = this._config.panels?.lights?.lights || [];
+    if (which.startsWith("room:")) return L.filter((l) => !l.outside && (l.room || "Inside") === which.slice(5)).map((l) => l.id);
     return L.filter((l) => which === "all" || (which === "outside") === !!l.outside).map((l) => l.id);
   }
 
@@ -584,8 +593,11 @@ class CcOverview extends CcBase {
 
   _lights(p) {
     const L = p.lights || [];
-    const cap = (this._caps || {}).lights ?? Infinity;
+    // lights_mode: 0 = every light, 1 = one button per room, 2 = Inside/Outside.
+    const mode = (this._caps || {}).lights_mode || 0;
     const any = (outside) => L.filter((l) => !!l.outside === outside).some((l) => this._on(l.id));
+    const rooms = [...new Set(L.filter((l) => !l.outside).map((l) => l.room || "Inside"))]
+      .sort((a, b) => (a === "Inside") - (b === "Inside") || a.localeCompare(b));
     const allOff = this._button("All off", "mdi:lightbulb-off", "alloff");
     let b;
     if (this._compact) {
@@ -593,8 +605,13 @@ class CcOverview extends CcBase {
       b = [];
       if (L.some((l) => !l.outside)) b.push(this._button(`Inside · ${count(false)} on`, "mdi:lamps", "group:inside", count(false) > 0));
       if (L.some((l) => l.outside)) b.push(this._button(`Outside · ${count(true)} on`, "mdi:outdoor-lamp", "group:outside", count(true) > 0));
-    } else if (L.length + 1 <= cap) {
+    } else if (mode === 0) {
       b = [...L.map((l) => this._button(l.label, l.icon, `toggle:${l.id}`, this._on(l.id))), allOff];
+    } else if (mode === 1 && rooms.length > 1) {
+      const on = (room) => L.filter((l) => !l.outside && (l.room || "Inside") === room).some((l) => this._on(l.id));
+      b = rooms.map((r) => this._button(r, ROOM_ICONS[r] || "mdi:lamps", `group:room:${r}`, on(r)));
+      if (L.some((l) => l.outside)) b.push(this._button("Outside", "mdi:outdoor-lamp", "group:outside", any(true)));
+      b.push(allOff);
     } else {
       b = [];
       if (L.some((l) => !l.outside)) b.push(this._button("Inside", "mdi:lamps", "group:inside", any(false)));
@@ -733,6 +750,11 @@ const VIEW_CSS = `
 .num{display:flex;align-items:center;gap:8px}.num .val{flex:1;text-align:center;font-size:22px;font-weight:700}
 .num .b{width:56px;min-height:48px}
 .pic{width:100%;border-radius:12px;display:block}
+.ctl.dim{grid-column:span 2;gap:10px}
+.dimrow{display:flex;align-items:center;gap:10px}.dimrow .b{flex:1;min-height:52px;flex-direction:row;justify-content:flex-start;padding:0 14px;gap:10px}
+.dimrow .pct{min-width:56px;text-align:right;font-size:20px;font-weight:700;color:var(--mute)}.ctl.dim.lit .pct{color:var(--c)}
+.ctl.dim input[type=range]{width:100%;height:36px;accent-color:var(--c);cursor:pointer}
+@media (max-width:420px){.ctl.dim{grid-column:1/-1}}
 `;
 
 class CcView extends CcBase {
@@ -760,6 +782,14 @@ class CcView extends CcBase {
     if (!s) return "";
     const d = domainOf(id);
     const name = this._name(id, strip);
+    const modes = s.attributes.supported_color_modes || [];
+    if (d === "light" && modes.some((m) => m !== "onoff")) {
+      const on = this._on(id);
+      const pct = on ? Math.max(1, Math.round(((s.attributes.brightness || 0) / 255) * 100)) : 0;
+      return `<div class="ctl dim${on ? " lit" : ""}"><div class="dimrow">${this._button(name, s.attributes.icon || "mdi:lightbulb", `toggle:${id}`, on)}
+        <div class="pct">${on ? `${pct}%` : "Off"}</div></div>
+        <input type="range" min="1" max="100" step="1" value="${pct || 1}" data-bri="${esc(id)}" aria-label="${esc(name)} brightness"></div>`;
+    }
     if (TOGGLE_DOMAINS.has(d)) {
       const icon = s.attributes.icon || { light: "mdi:lightbulb", fan: "mdi:fan", script: "mdi:script-text" }[d] || "mdi:toggle-switch";
       return this._button(name, icon, `toggle:${id}`, this._on(id));
@@ -813,6 +843,13 @@ class CcView extends CcBase {
       .map((g) => `<div class="g"><h3>${esc(g.title)}</h3><div class="items">${g.items
         .map((id) => this._item(id, [new RegExp(`^${g.title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*`, "i"), ...strip])).join("")}</div></div>`)
       .join("")}</div>`);
+    // Keep sliders in step with the light, except the one being dragged.
+    for (const r of this.shadowRoot.querySelectorAll("input[data-bri]")) {
+      if (this.shadowRoot.activeElement === r) continue;
+      const st = this._st(r.dataset.bri);
+      const v = st && st.state === "on" ? Math.max(1, Math.round(((st.attributes.brightness || 0) / 255) * 100)) : 1;
+      if (Number(r.value) !== v) r.value = v;
+    }
   }
 }
 
@@ -942,6 +979,23 @@ function lightLabel(hass, e) {
   if (dev && n.startsWith(dev)) n = n.slice(dev.length);
   n = n.replace(/^waymote\s*/i, "").replace(/\bexternal\b/i, "").replace(/\blights?\b/i, "").replace(/\s+/g, " ").trim();
   return n || friendly(hass, e.entity_id);
+}
+
+// Room for a light: HA area first, then the name. Outside lights are "Outside".
+const ROOM_RULES = [
+  [/bath|toilet|ensuite|shower|wc\b/, "Bathroom"],
+  [/bed|sleep/, "Bedroom"],
+  [/kitchen|galley|bench|cook/, "Kitchen"],
+  [/lounge|sofa|dinette|living|seat|couch/, "Lounge"],
+];
+function lightRoom(hass, e, outside) {
+  if (outside) return "Outside";
+  // Name first (a single whole-caravan area would otherwise swallow every light), then area.
+  const t = textOf(hass, e);
+  for (const [re, room] of ROOM_RULES) if (re.test(t)) return room;
+  const area = areaName(hass, e);
+  if (area && !/outside|outdoor|exterior/i.test(area)) return area;
+  return "Inside";
 }
 
 function lightIcon(text, outside) {
@@ -1084,7 +1138,7 @@ function buildOverview(hass, cats, all, nav) {
         .map((e) => {
           const t = textOf(hass, e);
           const outside = OUTSIDE_LIGHT_RE.test(t) || /outside|outdoor|exterior/i.test(areaName(hass, e));
-          return { id: e.entity_id, label: lightLabel(hass, e), icon: lightIcon(t, outside), outside };
+          return { id: e.entity_id, label: lightLabel(hass, e), icon: lightIcon(t, outside), outside, room: lightRoom(hass, e, outside) };
         })
         .sort((a, b) => Number(a.outside) - Number(b.outside) || a.label.localeCompare(b.label)),
     };
@@ -1148,14 +1202,16 @@ function buildGroups(hass, cat, list) {
     const t = textOf(hass, e);
     let g;
     if (cat === "security") g = d === "camera" ? "Cameras" : deviceName(hass, e.device_id) || "Security";
-    else if (cat === "lights") g = OUTSIDE_LIGHT_RE.test(t) || /outside|outdoor|exterior/i.test(areaName(hass, e)) ? "Outside" : "Inside";
+    else if (cat === "lights") g = lightRoom(hass, e, OUTSIDE_LIGHT_RE.test(t) || /outside|outdoor|exterior/i.test(areaName(hass, e)));
     else if (cat === "tyres") g = (t.match(/(front|rear)[ _](left|right)/) || [])[0]?.replace("_", " ") || deviceName(hass, e.device_id) || "Tyres";
     else if (cat === "location") g = /gps|satellite|hdop|accuracy|fix|latitude|longitude|atomic|speed|climb|bearing|heading|elevation|gradient/.test(t) ? "GPS" : /climate|rainfall/.test(t) ? "Climate this month" : /population|statistical|wikipedia/.test(t) ? "About this place" : "Where you are";
     else if (cat === "climate" && e.platform === P_WX) g = /short_text|uv_|fire_danger/.test(e.unique_id || "") ? "Forecast" : "Now";
     else g = deviceName(hass, e.device_id) || CATS[cat].title;
     add(g.replace(/\b\w/g, (c) => c.toUpperCase()), e.entity_id);
   }
-  return [...groups.entries()].map(([title, items]) => ({ title, items }));
+  const out = [...groups.entries()].map(([title, items]) => ({ title, items }));
+  if (cat === "lights") out.sort((a, b) => (a.title === "Outside") - (b.title === "Outside") || (a.title === "Inside") - (b.title === "Inside") || a.title.localeCompare(b.title));
+  return out;
 }
 
 function messageDashboard(message) {

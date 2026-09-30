@@ -742,6 +742,8 @@ const VIEW_CSS = `
 .items{display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
 .items .v .n{font-size:22px}
 .wide{grid-column:1/-1}
+.g.wide2{grid-column:span 2}@media (max-width:760px){.g.wide2{grid-column:auto}}
+.items.tanks{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}.items.tanks .v{min-height:96px}
 .wide .n{font-size:16px!important;font-weight:400!important;white-space:normal!important;line-height:1.5}
 .ctl{background:rgba(255,255,255,.04);border-radius:12px;padding:8px 12px;display:flex;flex-direction:column;gap:8px}
 .ctl .l{font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mute)}
@@ -839,7 +841,22 @@ class CcView extends CcBase {
       this._ensureMap();
     }
     const strip = (c.strip || []).map((s) => new RegExp(`^${s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*`, "i"));
-    patchHtml(this.shadowRoot.getElementById("body"), `<div class="groups">${(c.groups || [])
+    let lead = "";
+    if (c.tanks?.length) {
+      const colour = (pct, inv) => { const q = inv ? 100 - pct : pct; return q > 80 ? "#4ade80" : q > 60 ? "#a3e635" : q > 40 ? "#facc15" : q > 20 ? "#fb923c" : "#f87171"; };
+      lead += `<div class="g wide2"><h3>Tanks${c.tanks.some((t) => t.toggle) ? " · tap to select" : ""}</h3><div class="items tanks">${c.tanks.map((t) => {
+        const n = this._num(t.level) ?? 0;
+        const on = t.toggle ? this._on(t.toggle) : false;
+        return this._readout(t.label, this._fmt(t.level), {
+          cls: on ? "sel" : "", sub: [t.remaining ? this._fmt(t.remaining) : "", on ? "Selected" : ""].filter(Boolean).join(" · "),
+          bar: n, barColor: colour(n, t.grey), act: t.toggle ? `toggle:${t.toggle}` : "",
+        });
+      }).join("")}</div></div>`;
+    }
+    if (c.pumps?.length) {
+      lead += `<div class="g"><h3>Pumps &amp; valves</h3><div class="items">${c.pumps.map((x) => this._button(x.label, x.icon, `toggle:${x.id}`, this._on(x.id))).join("")}</div></div>`;
+    }
+    patchHtml(this.shadowRoot.getElementById("body"), `<div class="groups">${lead}${(c.groups || [])
       .map((g) => `<div class="g"><h3>${esc(g.title)}</h3><div class="items">${g.items
         .map((id) => this._item(id, [new RegExp(`^${g.title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*`, "i"), ...strip])).join("")}</div></div>`)
       .join("")}</div>`);
@@ -1310,7 +1327,15 @@ class CleverCaravanStrategy {
 
     for (const c of ORDER) {
       if (!cats.has(c)) continue;
-      const list = cats.get(c);
+      let list = cats.get(c);
+      let extra = {};
+      const wp = overview.panels.water;
+      if (c === "water" && wp) {
+        // Purpose-built Water page: tanks (tap to select) and pumps/valves first.
+        const used = new Set([...(wp.tanks || []).flatMap((t) => [t.level, t.remaining, t.toggle]), ...(wp.buttons || []).map((b) => b.id)].filter(Boolean));
+        extra = { tanks: wp.tanks || [], pumps: wp.buttons || [] };
+        list = list.filter((e) => !used.has(e.entity_id));
+      }
       views.push({
         title: CATS[c].title,
         path: c,
@@ -1324,7 +1349,8 @@ class CleverCaravanStrategy {
           back: `${base}/overview`,
           map: byDomain(list, "device_tracker").map((e) => e.entity_id),
           strip: ["Cerbo GX", "Waymote", "Clever Caravan", "Caravan", "TPMS"],
-          groups: buildGroups(hass, c, list),
+          groups: buildGroups(hass, c, list).map((g) => (c === "water" && extra.tanks ? { ...g, title: g.title === "Water" ? "Details" : g.title } : g)),
+          ...extra,
         }],
       });
     }

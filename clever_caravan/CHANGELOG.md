@@ -1,3 +1,6 @@
+## 0.4.14
+- Dashboard 0.1.29: lights by room + dimming; Water page with tappable tanks and pumps/valves
+
 ## 0.4.13
 - Waymote 0.5.0: combine outputs into two-tone lights
 

@@ -88,6 +88,11 @@ ha-icon{display:inline-flex}
 .b.on ha-icon{filter:drop-shadow(0 0 6px var(--c))}
 .b.alert{background:rgba(252,129,129,.25);border:2px solid #fc8181;color:#fc8181}
 .b:active{transform:scale(.97)}
+.cov{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.04);border-radius:14px;padding:8px 10px;flex:none}
+.cov .cvl{flex:1;min-width:0}.cov .l{font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cov .s{font-size:15px;font-weight:700;color:var(--ink)}.cov.moving .s{color:var(--c)}
+.cov .cvb{display:grid;grid-template-columns:repeat(3,minmax(52px,64px));gap:6px}.cov .cvb .b{min-height:48px;font-size:11px;padding:4px 2px}
+.fx{display:flex;gap:6px}.fx .b{flex:1;min-height:44px;flex-direction:row;font-size:12px}
 `;
 
 function esc(s) {
@@ -200,6 +205,19 @@ class CcBase extends HTMLElement {
   _button(label, icon, act, on = false, extra = "") {
     return `<button class="b ${on ? "on" : ""} ${extra}" data-act="${esc(act)}"><ha-icon icon="${icon}"></ha-icon><span>${esc(label)}</span></button>`;
   }
+  // Awning/cover row: name, state (+ power), Open / Stop / Close.
+  _coverRow(id, label) {
+    const s = this._st(id);
+    if (!s) return "";
+    const st = s.state;
+    const moving = st === "opening" || st === "closing";
+    const pw = s.attributes.power;
+    const state = st === "unknown" || st === "unavailable" ? "—" : st.charAt(0).toUpperCase() + st.slice(1);
+    const sub = pw ? `${state} · power ${pw}` : state;
+    return `<div class="cov${moving ? " moving" : ""}"><div class="cvl"><div class="l">${esc(label)}</div><div class="s">${esc(sub)}</div></div>
+      <div class="cvb">${this._button("Out", "mdi:arrow-expand-horizontal", `cover:${id}:open`, st === "open" || st === "opening")}${this._button("Stop", "mdi:stop", `cover:${id}:stop`)}${this._button("In", "mdi:arrow-collapse-horizontal", `cover:${id}:close`, st === "closed" || st === "closing")}</div></div>`;
+  }
+
   _navigate(path) {
     if (!path) return;
     history.pushState(null, "", path);
@@ -229,6 +247,14 @@ class CcBase extends HTMLElement {
         if (s.attributes.min != null) val = Math.max(Number(s.attributes.min), val);
         if (s.attributes.max != null) val = Math.min(Number(s.attributes.max), val);
         return h.callService(domainOf(id), "set_value", { entity_id: id, value: val });
+      }
+      case "cover": {
+        const [id, cmd] = rest;
+        return h.callService("cover", `${cmd}_cover`, { entity_id: id });
+      }
+      case "effect": {
+        const [id, ...fx] = rest;
+        return h.callService("light", "turn_on", { entity_id: id, effect: fx.join(":") });
       }
       case "climate_toggle": {
         const on = this._st(arg)?.state !== "off";
@@ -396,7 +422,7 @@ class CcOverview extends CcBase {
   }
 
   _panel(key, readouts, buttons, { alarm = false, fillButtons = false, pinned = "", pairButtons = false, keepLast = false } = {}) {
-    if (!readouts.length && !buttons.length) return "";
+    if (!readouts.length && !buttons.length && !pinned) return "";
     const s = CATS[key];
     const nav = this._config.panels[key]?.nav || "";
     // Reset the fitted cap whenever the panel's content count changes.
@@ -623,7 +649,14 @@ class CcOverview extends CcBase {
 
   _controls(p) {
     const b = (p.items || []).slice(0, 6).map((x) => this._button(x.label, x.icon, `toggle:${x.id}`, this._on(x.id)));
-    return this._panel("controls", [], b, { fillButtons: true });
+    const covers = p.covers || [];
+    if (this._compact && covers.length) {
+      // Phones: one button to the Controls page, where the awning controls live.
+      const moving = covers.some((c) => /opening|closing/.test(this._st(c.id)?.state || ""));
+      b.unshift(this._button(covers.length > 1 ? "Awnings" : covers[0].label, "mdi:awning-outline", `nav:${p.nav}`, moving));
+    }
+    const pinned = this._compact ? "" : covers.map((c) => this._coverRow(c.id, c.label)).join("");
+    return this._panel("controls", [], b, { fillButtons: true, pinned });
   }
 
   _tyres(p) {
@@ -785,6 +818,13 @@ class CcView extends CcBase {
     const d = domainOf(id);
     const name = this._name(id, strip);
     const modes = s.attributes.supported_color_modes || [];
+    const fxList = (s.attributes.effect_list || []).filter((x) => /^(white|ambient|amber)$/i.test(x));
+    if (d === "light" && fxList.length > 1) {
+      const on = this._on(id);
+      const cur = s.attributes.effect;
+      return `<div class="ctl dim">${this._button(name, s.attributes.icon || "mdi:outdoor-lamp", `toggle:${id}`, on)}
+        <div class="fx">${fxList.map((f) => this._button(f, f.toLowerCase() === "white" ? "mdi:white-balance-sunny" : "mdi:weather-sunset", `effect:${id}:${f}`, on && cur === f)).join("")}</div></div>`;
+    }
     if (d === "light" && modes.some((m) => m !== "onoff")) {
       const on = this._on(id);
       const pct = on ? Math.max(1, Math.round(((s.attributes.brightness || 0) / 255) * 100)) : 0;
@@ -805,6 +845,7 @@ class CcView extends CcBase {
     if (d === "number" || d === "input_number") {
       return `<div class="ctl"><div class="l">${esc(name)}</div><div class="num">${this._button("", "mdi:minus", `step:${id}:-1`)}<div class="val">${esc(this._fmt(id))}</div>${this._button("", "mdi:plus", `step:${id}:1`)}</div></div>`;
     }
+    if (d === "cover") return `<div class="wide">${this._coverRow(id, name)}</div>`;
     if (d === "climate") {
       return `<div class="ctl wide"><div class="l">${esc(name)} · ${esc(s.state)}</div><div class="row">
         ${this._button(`AC ${s.attributes.temperature ?? ""}°`, "mdi:air-conditioner", `climate_toggle:${id}`, s.state !== "off")}
@@ -916,9 +957,20 @@ function labelCategory(e) {
 
 // Devices that own a camera entity: everything on them belongs to Security.
 let CAMERA_DEVICES = new Set();
+// Object-id stems of cameras ("c230_cam_left" from camera.c230_cam_left_main), so
+// camera lights/switches/selects land in Security even when on another device.
+let CAMERA_STEMS = [];
+const CAMERA_SUFFIX_RE = /_(main|sub|sub_\d+|fluent|clear|balanced|high|low|snapshots?|stream|profile_?\d*|\d+)$/;
+function cameraStem(id) {
+  let o = id.split(".")[1] || "";
+  for (let i = 0; i < 3 && CAMERA_SUFFIX_RE.test(o); i++) o = o.replace(CAMERA_SUFFIX_RE, "");
+  return o;
+}
 
 function classify(hass, e) {
   if (e.device_id && CAMERA_DEVICES.has(e.device_id)) return "security";
+  const obj = e.entity_id.split(".")[1] || "";
+  if (domainOf(e.entity_id) !== "camera" && CAMERA_STEMS.some((st) => obj === st || obj.startsWith(`${st}_`))) return "security";
   const fromLabel = labelCategory(e);
   if (fromLabel !== undefined) return fromLabel;
   const st = hass.states[e.entity_id];
@@ -1167,11 +1219,15 @@ function buildOverview(hass, cats, all, nav) {
     };
   }
 
+  const coverEnts = byDomain(cats.get("controls") || [], "cover");
   const controls = byDomain(cats.get("controls") || [], "switch", "input_boolean", "fan")
-    .filter((e) => e.unique_id !== "ozxcorp_dcx_relay"); // TEMP-DCX: relay lives in Power
-  if (controls.length) {
+    .filter((e) => e.unique_id !== "ozxcorp_dcx_relay") // TEMP-DCX: relay lives in Power
+    .filter((e) => !(coverEnts.length && /awning.*power|power.*awning|actuator.*power/.test(textOf(hass, e)))) // cover handles power
+    .filter((e) => !/identify|restart|reboot|auto recovery|auto_recovery/.test(textOf(hass, e)));
+  if (controls.length || coverEnts.length) {
     panels.controls = {
       nav: nav("controls"),
+      covers: coverEnts.map((e) => ({ id: e.entity_id, label: cleanName(hass, e) })),
       items: controls.map((e) => ({
         id: e.entity_id,
         label: lightLabel(hass, e).replace(/\s+fan$/i, ""),
@@ -1224,7 +1280,13 @@ function buildGroups(hass, cat, list) {
     if (d === "device_tracker" || d === "weather") continue;
     const t = textOf(hass, e);
     let g;
-    if (cat === "security") g = d === "camera" ? "Cameras" : deviceName(hass, e.device_id) || "Security";
+    if (cat === "security") {
+      const obj = e.entity_id.split(".")[1];
+      const stem = CAMERA_STEMS.filter((st) => obj === st || obj.startsWith(`${st}_`)).sort((a, b) => b.length - a.length)[0];
+      g = d === "camera" ? "Cameras" : deviceName(hass, e.device_id) || (stem ? stem.replace(/_/g, " ") : "Security");
+    } else if (cat === "controls") {
+      g = d === "cover" ? "Awnings" : /awning|actuator/.test(t) ? "Awnings" : d === "button" || /identify|restart|reboot|reset/.test(t) ? "Maintenance" : deviceName(hass, e.device_id) || "Controls";
+    }
     else if (cat === "lights") g = lightRoom(hass, e, OUTSIDE_LIGHT_RE.test(t) || /outside|outdoor|exterior/i.test(areaName(hass, e)));
     else if (cat === "tyres") g = (t.match(/(front|rear)[ _](left|right)/) || [])[0]?.replace("_", " ") || deviceName(hass, e.device_id) || "Tyres";
     else if (cat === "location") g = /gps|satellite|hdop|accuracy|fix|latitude|longitude|atomic|speed|climb|bearing|heading|elevation|gradient/.test(t) ? "GPS" : /climate|rainfall/.test(t) ? "Climate this month" : /population|statistical|wikipedia/.test(t) ? "About this place" : "Where you are";
@@ -1232,7 +1294,22 @@ function buildGroups(hass, cat, list) {
     else g = deviceName(hass, e.device_id) || CATS[cat].title;
     add(g.replace(/\b\w/g, (c) => c.toUpperCase()), e.entity_id);
   }
+  // One stream per camera (prefer the light "sub" stream).
+  if (cat === "security" && groups.has("Cameras")) {
+    const rank = (id) => (/_sub$/.test(id) ? 0 : /_sub_\d+$/.test(id) ? 1 : /_main$/.test(id) ? 3 : 2);
+    const best = new Map();
+    for (const id of groups.get("Cameras")) {
+      const st = cameraStem(id);
+      if (!best.has(st) || rank(id) < rank(best.get(st))) best.set(st, id);
+    }
+    groups.set("Cameras", [...best.values()]);
+  }
   const out = [...groups.entries()].map(([title, items]) => ({ title, items }));
+  if (cat === "controls") {
+    const r = (t) => (t === "Awnings" ? 0 : t === "Maintenance" ? 2 : 1);
+    out.sort((a, b) => r(a.title) - r(b.title));
+    for (const g of out) if (g.title === "Awnings") g.items.sort((a, b) => (domainOf(a) === "cover" ? 0 : 1) - (domainOf(b) === "cover" ? 0 : 1) || a.localeCompare(b));
+  }
   if (cat === "lights") out.sort((a, b) => (a.title === "Outside") - (b.title === "Outside") || (a.title === "Inside") - (b.title === "Inside") || a.title.localeCompare(b.title));
   return out;
 }
@@ -1303,6 +1380,7 @@ class CleverCaravanStrategy {
     CAMERA_DEVICES = new Set(
       registry.filter((e) => domainOf(e.entity_id) === "camera" && e.device_id).map((e) => e.device_id)
     );
+    CAMERA_STEMS = [...new Set(registry.filter((e) => domainOf(e.entity_id) === "camera").map((e) => cameraStem(e.entity_id)).filter((x) => x.length >= 4))];
 
     const cats = new Map();
     const all = [];
@@ -1356,7 +1434,7 @@ class CleverCaravanStrategy {
           cat: c,
           back: `${base}/overview`,
           map: byDomain(list, "device_tracker").map((e) => e.entity_id),
-          strip: ["Cerbo GX", "Waymote", "Clever Caravan", "Caravan", "TPMS"],
+          strip: ["Cerbo GX", "Waymote", "External", "Clever Caravan", "Caravan", "TPMS"],
           groups: buildGroups(hass, c, list).map((g) => (c === "water" && extra.tanks ? { ...g, title: g.title === "Water" ? "Details" : g.title } : g)),
           ...extra,
         }],

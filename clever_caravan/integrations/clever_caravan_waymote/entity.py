@@ -18,7 +18,7 @@ from homeassistant.components import mqtt
 from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
 
-from .const import AVAILABILITY_TOPIC, CONTROL_TOPIC, DOMAIN, STATUS_TOPIC
+from .const import AVAILABILITY_TOPIC, CONTROL_TOPIC, DOMAIN, STATUS_TOPIC, icon_for
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ class WaymoteOutputEntity:
     _attr_has_entity_name = False
     _attr_should_poll = False
 
-    def __init__(self, coordinator, channel: int) -> None:
+    def __init__(self, coordinator, channel: int, domain: str = "switch") -> None:
         super().__init__()
         self._coordinator = coordinator
         self._channel = channel
@@ -44,7 +44,9 @@ class WaymoteOutputEntity:
 
         cfg = self._cfg()
         self._attr_name = cfg.get("name", f"Output {channel}")
-        self._attr_icon = cfg.get("icon")
+        # A fresh bridge gives every output the same generic icon; only keep it
+        # for switches, so lights and fans use their own domain icon.
+        self._attr_icon = icon_for(cfg.get("icon"), domain)
         self._attr_device_info = DeviceInfo(identifiers={(DOMAIN, base)})
 
     def _cfg(self) -> dict[str, Any]:

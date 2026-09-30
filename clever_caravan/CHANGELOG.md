@@ -1,3 +1,6 @@
+## 0.4.18
+- Waymote 0.6.1: combined devices survive reconfigure and can be managed from Configure
+
 ## 0.4.17
 - Re-release of 0.4.16 (no changes)
 

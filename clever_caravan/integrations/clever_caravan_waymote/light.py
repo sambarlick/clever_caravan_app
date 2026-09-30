@@ -24,7 +24,6 @@ from . import WaymoteConfigEntry
 from .const import (
     AVAILABILITY_TOPIC,
     COMBO_TWO_TONE,
-    CONF_COMBOS,
     CONTROL_TOPIC,
     DOMAIN,
     STATUS_TOPIC,
@@ -32,6 +31,7 @@ from .const import (
     TONE_AMBIENT_KELVIN,
     TONE_WHITE,
     TONE_WHITE_KELVIN,
+    get_combos,
 )
 from .entity import WaymoteOutputEntity
 from .switch import _channels_for_domain
@@ -46,10 +46,10 @@ async def async_setup_entry(
 ) -> None:
     coordinator = entry.runtime_data
     entities: list[LightEntity] = [
-        WaymoteOutputLight(coordinator, ch)
+        WaymoteOutputLight(coordinator, ch, "light")
         for ch in _channels_for_domain(entry, "light")
     ]
-    for index, combo in enumerate(entry.data.get(CONF_COMBOS) or []):
+    for index, combo in enumerate(get_combos(entry)):
         if combo.get("type") == COMBO_TWO_TONE:
             entities.append(WaymoteTwoToneLight(coordinator, combo, index))
     async_add_entities(entities)

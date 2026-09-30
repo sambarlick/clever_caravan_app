@@ -41,6 +41,8 @@ from .const import (
     REQUEST_TIMEOUT,
     SUPPORTED_DOMAINS,
     channels_in_combos,
+    combo_channels,
+    get_combos,
     infer_domain,
 )
 
@@ -116,6 +118,7 @@ class WaymoteConfigFlow(ConfigFlow, domain=DOMAIN):
         self._enabled: dict[int, str] = {}
         self._domains: dict[str, str] = {}
         self._combos: list[dict[str, Any]] = []
+        self._existing_combos: list[dict[str, Any]] = []
         self._reconfigure_entry = None
 
     async def async_step_reconfigure(
@@ -125,6 +128,9 @@ class WaymoteConfigFlow(ConfigFlow, domain=DOMAIN):
         self._reconfigure_entry = self._get_reconfigure_entry()
         self._host = self._reconfigure_entry.data.get(CONF_HOST)
         self._port = self._reconfigure_entry.data.get(CONF_PORT, DEFAULT_PORT)
+        # Carry the existing combined devices through, so walking the flow again
+        # does not wipe them.
+        self._existing_combos = list(get_combos(self._reconfigure_entry))
         return await self.async_step_user()
 
     async def async_step_user(
@@ -214,7 +220,11 @@ class WaymoteConfigFlow(ConfigFlow, domain=DOMAIN):
                 if channel is not None:
                     domains[str(channel)] = value
             self._domains = domains
-            self._combos = []
+            self._combos = [
+                combo
+                for combo in self._existing_combos
+                if all(ch in self._enabled for ch in combo_channels(combo))
+            ]
             return await self.async_step_combine()
 
         fields: dict[Any, Any] = {}
@@ -240,8 +250,10 @@ class WaymoteConfigFlow(ConfigFlow, domain=DOMAIN):
             CONF_COMBOS: self._combos,
         }
         if self._reconfigure_entry is not None:
+            options = dict(self._reconfigure_entry.options)
+            options[CONF_COMBOS] = self._combos
             return self.async_update_reload_and_abort(
-                self._reconfigure_entry, data=data
+                self._reconfigure_entry, data=data, options=options
             )
         return self.async_create_entry(title=f"Waymote ({self._host})", data=data)
 
@@ -343,31 +355,194 @@ class WaymoteConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class WaymoteOptionsFlow(OptionsFlow):
-    """Adjustable settings, reached from the integration's Configure button."""
+    """Settings and combined devices, from the integration's Configure button.
+
+    Editing combos here avoids re-running onboarding (which would ask for every
+    output name again) just to add or remove one device.
+    """
+
+    def __init__(self) -> None:
+        self._combos: list[dict[str, Any]] | None = None
+
+    # --- helpers -----------------------------------------------------------
+
+    @property
+    def _entry(self):
+        return self.config_entry
+
+    def _current_combos(self) -> list[dict[str, Any]]:
+        if self._combos is None:
+            self._combos = [dict(c) for c in get_combos(self._entry)]
+        return self._combos
+
+    def _enabled_outputs(self) -> dict[int, str]:
+        """Enabled outputs and their names, read from the bridge's config."""
+        coordinator = getattr(self._entry, "runtime_data", None)
+        outputs = ((getattr(coordinator, "data", None) or {}).get("outputs") or {})
+        result: dict[int, str] = {}
+        for key, cfg in outputs.items():
+            if str(key).isdigit() and isinstance(cfg, dict) and cfg.get("enabled"):
+                result[int(key)] = cfg.get("name", f"Output {key}")
+        return result
+
+    def _free_channels(self) -> dict[int, str]:
+        used = channels_in_combos(self._current_combos())
+        return {ch: n for ch, n in self._enabled_outputs().items() if ch not in used}
+
+    def _save(self) -> ConfigFlowResult:
+        options = dict(self._entry.options)
+        options[CONF_COMBOS] = self._current_combos()
+        options.setdefault(
+            CONF_AWNING_POWER_OFF_MINUTES, DEFAULT_AWNING_POWER_OFF_MINUTES
+        )
+        options.setdefault(
+            CONF_AWNING_STOP_CUTS_POWER, DEFAULT_AWNING_STOP_CUTS_POWER
+        )
+        # Explicit reload so new or removed devices appear straight away,
+        # without an update listener.
+        self.hass.config_entries.async_schedule_reload(self._entry.entry_id)
+        return self.async_create_entry(data=options)
+
+    # --- menu --------------------------------------------------------------
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        if user_input is not None:
-            return self.async_create_entry(data=user_input)
+        options = ["settings"]
+        free = self._free_channels()
+        if len(free) >= 2:
+            options.append("add_two_tone")
+        if len(free) >= 3:
+            options.append("add_awning")
+        if self._current_combos():
+            options.append("remove_combo")
+        options.append("save")
+        return self.async_show_menu(step_id="init", menu_options=options)
 
-        options = self.config_entry.options
+    async def async_step_save(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        return self._save()
+
+    # --- settings ----------------------------------------------------------
+
+    async def async_step_settings(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        if user_input is not None:
+            options = dict(self._entry.options)
+            options.update(user_input)
+            options[CONF_COMBOS] = self._current_combos()
+            self.hass.config_entries.async_schedule_reload(self._entry.entry_id)
+            return self.async_create_entry(data=options)
+
+        opts = self._entry.options
         schema = vol.Schema(
             {
                 vol.Optional(
                     CONF_AWNING_POWER_OFF_MINUTES,
-                    default=options.get(
+                    default=opts.get(
                         CONF_AWNING_POWER_OFF_MINUTES,
                         DEFAULT_AWNING_POWER_OFF_MINUTES,
                     ),
                 ): vol.All(vol.Coerce(int), vol.Range(min=0, max=120)),
                 vol.Optional(
                     CONF_AWNING_STOP_CUTS_POWER,
-                    default=options.get(
+                    default=opts.get(
                         CONF_AWNING_STOP_CUTS_POWER,
                         DEFAULT_AWNING_STOP_CUTS_POWER,
                     ),
                 ): bool,
             }
         )
-        return self.async_show_form(step_id="init", data_schema=schema)
+        return self.async_show_form(step_id="settings", data_schema=schema)
+
+    # --- add / remove combined devices -------------------------------------
+
+    async def async_step_add_two_tone(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        errors: dict[str, str] = {}
+        free = self._free_channels()
+
+        if user_input is not None:
+            white, ambient = int(user_input["white"]), int(user_input["ambient"])
+            if white == ambient:
+                errors["base"] = "same_output"
+            else:
+                self._current_combos().append(
+                    {
+                        "type": COMBO_TWO_TONE,
+                        "name": user_input["name"].strip() or f"Light {white}/{ambient}",
+                        "white": white,
+                        "ambient": ambient,
+                    }
+                )
+                return await self.async_step_init()
+
+        options = {str(ch): f"{n} \u2014 Output {ch}" for ch, n in sorted(free.items())}
+        schema = vol.Schema(
+            {
+                vol.Required("name"): str,
+                vol.Required("white"): vol.In(options),
+                vol.Required("ambient"): vol.In(options),
+            }
+        )
+        return self.async_show_form(
+            step_id="add_two_tone", data_schema=schema, errors=errors
+        )
+
+    async def async_step_add_awning(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        errors: dict[str, str] = {}
+        free = self._free_channels()
+
+        if user_input is not None:
+            power = int(user_input["power"])
+            extend = int(user_input["extend"])
+            retract = int(user_input["retract"])
+            if len({power, extend, retract}) < 3:
+                errors["base"] = "same_output"
+            else:
+                self._current_combos().append(
+                    {
+                        "type": COMBO_AWNING,
+                        "name": user_input["name"].strip() or f"Awning {power}",
+                        "power": power,
+                        "extend": extend,
+                        "retract": retract,
+                    }
+                )
+                return await self.async_step_init()
+
+        options = {str(ch): f"{n} \u2014 Output {ch}" for ch, n in sorted(free.items())}
+        schema = vol.Schema(
+            {
+                vol.Required("name"): str,
+                vol.Required("power"): vol.In(options),
+                vol.Required("extend"): vol.In(options),
+                vol.Required("retract"): vol.In(options),
+            }
+        )
+        return self.async_show_form(
+            step_id="add_awning", data_schema=schema, errors=errors
+        )
+
+    async def async_step_remove_combo(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        combos = self._current_combos()
+
+        if user_input is not None:
+            index = int(user_input["combo"])
+            if 0 <= index < len(combos):
+                combos.pop(index)
+            return await self.async_step_init()
+
+        options = {
+            str(i): f"{c.get('name')} ({'awning' if c.get('type') == COMBO_AWNING else 'two-tone light'})"
+            for i, c in enumerate(combos)
+        }
+        schema = vol.Schema({vol.Required("combo"): vol.In(options)})
+        return self.async_show_form(step_id="remove_combo", data_schema=schema)

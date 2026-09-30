@@ -33,14 +33,15 @@ from homeassistant.helpers.event import async_call_later
 from . import WaymoteConfigEntry
 from .const import (
     AVAILABILITY_TOPIC,
+    STATUS_TOPIC,
     COMBO_AWNING,
     CONF_AWNING_POWER_OFF_MINUTES,
     CONF_AWNING_STOP_CUTS_POWER,
-    CONF_COMBOS,
     CONTROL_TOPIC,
     DEFAULT_AWNING_POWER_OFF_MINUTES,
     DEFAULT_AWNING_STOP_CUTS_POWER,
     DOMAIN,
+    get_combos,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -53,7 +54,7 @@ async def async_setup_entry(
 ) -> None:
     coordinator = entry.runtime_data
     entities: list[CoverEntity] = []
-    for index, combo in enumerate(entry.data.get(CONF_COMBOS) or []):
+    for index, combo in enumerate(get_combos(entry)):
         if combo.get("type") == COMBO_AWNING:
             entities.append(WaymoteAwningCover(coordinator, entry, combo, index))
     async_add_entities(entities)
@@ -85,6 +86,7 @@ class WaymoteAwningCover(CoverEntity):
         self._closing = False
         self._closed: bool | None = None
         self._available = True
+        self._power_on = False
         self._cancel_power_off = None
 
     # --- settings ----------------------------------------------------------
@@ -123,6 +125,14 @@ class WaymoteAwningCover(CoverEntity):
     def available(self) -> bool:
         return self._available
 
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Power state shown on the cover, so both read as one device.
+
+        Read-only here - control is the awning's own Power switch.
+        """
+        return {"power": "on" if self._power_on else "off"}
+
     # --- mqtt --------------------------------------------------------------
 
     async def async_added_to_hass(self) -> None:
@@ -137,7 +147,22 @@ class WaymoteAwningCover(CoverEntity):
             await mqtt.async_subscribe(self.hass, AVAILABILITY_TOPIC, _availability)
         )
 
+        @callback
+        def _power_status(msg: mqtt.ReceiveMessage) -> None:
+            payload = msg.payload.strip().upper()
+            if payload in ("ON", "OFF"):
+                self._power_on = payload == "ON"
+                self.async_write_ha_state()
+
+        self.async_on_remove(
+            await mqtt.async_subscribe(
+                self.hass, STATUS_TOPIC.format(n=self._power), _power_status
+            )
+        )
+
     async def _publish(self, channel: int, on: bool) -> None:
+        if channel == self._power:
+            self._power_on = on
         await mqtt.async_publish(
             self.hass, CONTROL_TOPIC.format(n=channel), "ON" if on else "OFF",
             qos=1, retain=True,

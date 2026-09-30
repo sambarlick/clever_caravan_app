@@ -20,6 +20,7 @@ from .const import (
     CONF_DOMAINS,
     CONTROL_TOPIC,
     DEFAULT_DOMAIN,
+    get_combos,
     STATUS_TOPIC,
     channels_in_combos,
 )
@@ -34,7 +35,7 @@ def _channels_for_domain(entry: WaymoteConfigEntry, target: str) -> list[int]:
     domains = entry.data.get(CONF_DOMAINS, {})
     # Channels used by a combined device are owned by that device, not by a
     # standalone entity.
-    combined = channels_in_combos(entry.data.get(CONF_COMBOS))
+    combined = channels_in_combos(get_combos(entry))
     result = []
     for key, cfg in outputs.items():
         if not (str(key).isdigit() and isinstance(cfg, dict) and cfg.get("enabled")):
@@ -57,7 +58,7 @@ async def async_setup_entry(
         WaymoteOutputSwitch(coordinator, ch)
         for ch in _channels_for_domain(entry, "switch")
     ]
-    for combo in entry.data.get(CONF_COMBOS) or []:
+    for combo in get_combos(entry):
         if combo.get("type") == COMBO_AWNING:
             entities.append(
                 WaymoteAwningPowerSwitch(coordinator, combo, int(combo["power"]))
@@ -112,7 +113,6 @@ class WaymoteAwningPowerSwitch(WaymoteOutputEntity, SwitchEntity):
         name = combo.get("name") or f"Awning {channel}"
         self._attr_name = f"{name} Power"
         self._attr_icon = "mdi:power-plug"
-        self._attr_entity_category = EntityCategory.CONFIG
 
     @property
     def is_on(self) -> bool:

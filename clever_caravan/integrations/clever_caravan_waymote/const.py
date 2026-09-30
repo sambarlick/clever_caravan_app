@@ -53,6 +53,29 @@ TONE_WHITE = "White"
 TONE_AMBIENT = "Ambient"
 
 
+# The generic icon a fresh bridge ships with. Kept for switches, ignored for
+# lights/fans so Home Assistant uses its own domain icon instead.
+GENERIC_ICON = "mdi:electric-switch"
+
+
+def icon_for(stored_icon: str | None, domain: str) -> str | None:
+    """Icon to use for an output, or None to let HA pick the domain default."""
+    if domain != "switch" and (stored_icon or GENERIC_ICON) == GENERIC_ICON:
+        return None
+    return stored_icon
+
+
+def get_combos(entry) -> list[dict]:
+    """Combined devices for this entry.
+
+    Options win when present: the Configure screen edits combos there, while
+    onboarding/reconfigure writes both, so the two never disagree.
+    """
+    if CONF_COMBOS in entry.options:
+        return entry.options.get(CONF_COMBOS) or []
+    return entry.data.get(CONF_COMBOS) or []
+
+
 def combo_channels(combo: dict) -> list[int]:
     """Channel numbers consumed by one combo."""
     if combo.get("type") == COMBO_TWO_TONE:

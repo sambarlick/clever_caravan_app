@@ -62,11 +62,51 @@
     "step": {
       "init": {
         "title": "Waymote settings",
+        "description": "Add or remove combined devices, change awning power settings, then save.",
+        "menu_options": {
+          "settings": "Awning power settings",
+          "add_two_tone": "Add a two-tone light (White + Ambient)",
+          "add_awning": "Add an awning (Power + Extend + Retract)",
+          "remove_combo": "Remove a combined device",
+          "save": "Save and close"
+        }
+      },
+      "settings": {
+        "title": "Awning power",
         "data": {
           "awning_power_off_minutes": "Turn awning power off after (minutes, 0 to never)",
           "awning_stop_cuts_power": "Stop also cuts awning power"
         }
+      },
+      "add_two_tone": {
+        "title": "Two-tone light",
+        "description": "Pick the two outputs that make up one light. They will never be on at the same time.",
+        "data": {
+          "name": "Name",
+          "white": "White output",
+          "ambient": "Ambient output"
+        }
+      },
+      "add_awning": {
+        "title": "Awning",
+        "description": "Pick the three outputs that make up one awning. Extend and Retract are never on together, and Power is switched on automatically when it moves.",
+        "data": {
+          "name": "Name",
+          "power": "Power output",
+          "extend": "Extend output",
+          "retract": "Retract output"
+        }
+      },
+      "remove_combo": {
+        "title": "Remove a combined device",
+        "description": "Its outputs go back to being separate entities.",
+        "data": {
+          "combo": "Device"
+        }
       }
+    },
+    "error": {
+      "same_output": "Pick different outputs."
     }
   }
 }

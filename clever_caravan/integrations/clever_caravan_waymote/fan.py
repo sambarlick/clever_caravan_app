@@ -23,7 +23,7 @@ async def async_setup_entry(
 ) -> None:
     coordinator = entry.runtime_data
     async_add_entities(
-        WaymoteOutputFan(coordinator, ch)
+        WaymoteOutputFan(coordinator, ch, "fan")
         for ch in _channels_for_domain(entry, "fan")
     )
 

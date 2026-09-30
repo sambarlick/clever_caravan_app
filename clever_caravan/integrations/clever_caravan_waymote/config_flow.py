@@ -21,19 +21,26 @@ from typing import Any
 import aiohttp
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import ConfigFlow, ConfigFlowResult, OptionsFlow
 from homeassistant.const import CONF_HOST, CONF_PORT
+from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import (
     API_CONFIG_PATH,
+    COMBO_AWNING,
     COMBO_TWO_TONE,
+    CONF_AWNING_POWER_OFF_MINUTES,
+    CONF_AWNING_STOP_CUTS_POWER,
+    DEFAULT_AWNING_POWER_OFF_MINUTES,
+    DEFAULT_AWNING_STOP_CUTS_POWER,
     CONF_COMBOS,
     CONF_DOMAINS,
     DEFAULT_PORT,
     DOMAIN,
     REQUEST_TIMEOUT,
     SUPPORTED_DOMAINS,
+    channels_in_combos,
     infer_domain,
 )
 
@@ -96,6 +103,11 @@ class WaymoteConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for a Waymote bridge."""
 
     VERSION = 1
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry) -> "WaymoteOptionsFlow":
+        return WaymoteOptionsFlow()
 
     def __init__(self) -> None:
         self._host: str | None = None
@@ -235,7 +247,7 @@ class WaymoteConfigFlow(ConfigFlow, domain=DOMAIN):
 
     def _free_channels(self) -> dict[int, str]:
         """Enabled outputs not already consumed by a combo."""
-        used = {c for combo in self._combos for c in (combo["white"], combo["ambient"])}
+        used = channels_in_combos(self._combos)
         return {ch: name for ch, name in self._enabled.items() if ch not in used}
 
     async def async_step_combine(
@@ -244,9 +256,11 @@ class WaymoteConfigFlow(ConfigFlow, domain=DOMAIN):
         """Offer to combine outputs into a single device, or finish."""
         if len(self._free_channels()) < 2:
             return self._finish()
-        return self.async_show_menu(
-            step_id="combine", menu_options=["two_tone", "finish"]
-        )
+        options = ["two_tone"]
+        if len(self._free_channels()) >= 3:
+            options.append("awning")
+        options.append("finish")
+        return self.async_show_menu(step_id="combine", menu_options=options)
 
     async def async_step_finish(
         self, user_input: dict[str, Any] | None = None
@@ -288,3 +302,72 @@ class WaymoteConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="two_tone", data_schema=schema, errors=errors
         )
+
+    async def async_step_awning(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Combine Power + Extend + Retract into one awning."""
+        errors: dict[str, str] = {}
+        free = self._free_channels()
+
+        if user_input is not None:
+            power = int(user_input["power"])
+            extend = int(user_input["extend"])
+            retract = int(user_input["retract"])
+            if len({power, extend, retract}) < 3:
+                errors["base"] = "same_output"
+            else:
+                self._combos.append(
+                    {
+                        "type": COMBO_AWNING,
+                        "name": user_input["name"].strip() or f"Awning {power}",
+                        "power": power,
+                        "extend": extend,
+                        "retract": retract,
+                    }
+                )
+                return await self.async_step_combine()
+
+        options = {str(ch): f"{name} \u2014 Output {ch}" for ch, name in sorted(free.items())}
+        schema = vol.Schema(
+            {
+                vol.Required("name"): str,
+                vol.Required("power"): vol.In(options),
+                vol.Required("extend"): vol.In(options),
+                vol.Required("retract"): vol.In(options),
+            }
+        )
+        return self.async_show_form(
+            step_id="awning", data_schema=schema, errors=errors
+        )
+
+
+class WaymoteOptionsFlow(OptionsFlow):
+    """Adjustable settings, reached from the integration's Configure button."""
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        if user_input is not None:
+            return self.async_create_entry(data=user_input)
+
+        options = self.config_entry.options
+        schema = vol.Schema(
+            {
+                vol.Optional(
+                    CONF_AWNING_POWER_OFF_MINUTES,
+                    default=options.get(
+                        CONF_AWNING_POWER_OFF_MINUTES,
+                        DEFAULT_AWNING_POWER_OFF_MINUTES,
+                    ),
+                ): vol.All(vol.Coerce(int), vol.Range(min=0, max=120)),
+                vol.Optional(
+                    CONF_AWNING_STOP_CUTS_POWER,
+                    default=options.get(
+                        CONF_AWNING_STOP_CUTS_POWER,
+                        DEFAULT_AWNING_STOP_CUTS_POWER,
+                    ),
+                ): bool,
+            }
+        )
+        return self.async_show_form(step_id="init", data_schema=schema)

@@ -1,7 +1,7 @@
 {
   "domain": "clever_caravan_waymote",
   "name": "Clever Caravan: Waymote",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "config_flow": true,
   "dependencies": [
     "mqtt"

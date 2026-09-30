@@ -1,3 +1,6 @@
+## 0.4.15
+- Waymote 0.6.0: awning covers with power handling and adjustable settings
+
 ## 0.4.14
 - Dashboard 0.1.29: lights by room + dimming; Water page with tappable tanks and pumps/valves
 

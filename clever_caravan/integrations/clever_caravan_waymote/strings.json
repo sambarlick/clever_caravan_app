@@ -22,7 +22,8 @@
         "description": "Some outputs work together as one device \u2014 for example a White and an Ambient light on the same fitting. Add those now, or finish.",
         "menu_options": {
           "two_tone": "Add a two-tone light (White + Ambient)",
-          "finish": "Finish"
+          "finish": "Finish",
+          "awning": "Add an awning (Power + Extend + Retract)"
         }
       },
       "two_tone": {
@@ -32,6 +33,16 @@
           "name": "Name",
           "white": "White output",
           "ambient": "Ambient output"
+        }
+      },
+      "awning": {
+        "title": "Awning",
+        "description": "Pick the three outputs that make up one awning. Extend and Retract are never on together, and Power is switched on automatically when it moves.",
+        "data": {
+          "name": "Name",
+          "power": "Power output",
+          "extend": "Extend output",
+          "retract": "Retract output"
         }
       }
     },
@@ -45,6 +56,17 @@
       "already_configured": "This Waymote bridge is already set up.",
       "reconfigure_successful": "Waymote settings updated.",
       "reconfigure_failed": "Could not update the Waymote configuration."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Waymote settings",
+        "data": {
+          "awning_power_off_minutes": "Turn awning power off after (minutes, 0 to never)",
+          "awning_stop_cuts_power": "Stop also cuts awning power"
+        }
+      }
     }
   }
 }

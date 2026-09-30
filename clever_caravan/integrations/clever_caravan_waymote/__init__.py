@@ -24,6 +24,7 @@ _LOGGER = logging.getLogger(__name__)
 # Outputs become switches/lights/fans; plus bridge-level sensors and buttons.
 PLATFORMS: list[Platform] = [
     Platform.SWITCH,
+    Platform.COVER,
     Platform.LIGHT,
     Platform.FAN,
     Platform.SENSOR,

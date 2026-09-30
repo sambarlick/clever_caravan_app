@@ -14,7 +14,15 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import WaymoteConfigEntry
-from .const import CONF_COMBOS, CONF_DOMAINS, DEFAULT_DOMAIN, channels_in_combos
+from .const import (
+    COMBO_AWNING,
+    CONF_COMBOS,
+    CONF_DOMAINS,
+    CONTROL_TOPIC,
+    DEFAULT_DOMAIN,
+    STATUS_TOPIC,
+    channels_in_combos,
+)
 from .entity import WaymoteBridgeEntity, WaymoteOutputEntity
 
 AUTORECOVERY_TOPIC = "Waymote/CAN/AutoRecovery"
@@ -49,6 +57,11 @@ async def async_setup_entry(
         WaymoteOutputSwitch(coordinator, ch)
         for ch in _channels_for_domain(entry, "switch")
     ]
+    for combo in entry.data.get(CONF_COMBOS) or []:
+        if combo.get("type") == COMBO_AWNING:
+            entities.append(
+                WaymoteAwningPowerSwitch(coordinator, combo, int(combo["power"]))
+            )
     entities.append(WaymoteAutoRecoverySwitch(coordinator))
     async_add_entities(entities)
 
@@ -89,3 +102,24 @@ class WaymoteAutoRecoverySwitch(WaymoteBridgeEntity, SwitchEntity):
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         await mqtt.async_publish(self.hass, AUTORECOVERY_TOPIC, "OFF", qos=1, retain=False)
+
+
+class WaymoteAwningPowerSwitch(WaymoteOutputEntity, SwitchEntity):
+    """The Power relay of an awning, shown on its own so it can be seen and set."""
+
+    def __init__(self, coordinator, combo: dict, channel: int) -> None:
+        super().__init__(coordinator, channel)
+        name = combo.get("name") or f"Awning {channel}"
+        self._attr_name = f"{name} Power"
+        self._attr_icon = "mdi:power-plug"
+        self._attr_entity_category = EntityCategory.CONFIG
+
+    @property
+    def is_on(self) -> bool:
+        return self._is_on
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        await self._async_set(True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        await self._async_set(False)

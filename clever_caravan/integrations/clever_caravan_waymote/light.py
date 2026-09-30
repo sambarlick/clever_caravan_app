@@ -116,6 +116,13 @@ class WaymoteTwoToneLight(LightEntity):
         return self._tone
 
     @property
+    def brightness(self) -> int | None:
+        # The relays are on/off only. HA shows a brightness slider for any
+        # colour-temp light; reporting full brightness keeps it at 100% rather
+        # than looking broken.
+        return 255 if self._is_on else None
+
+    @property
     def color_temp_kelvin(self) -> int:
         return TONE_WHITE_KELVIN if self._tone == TONE_WHITE else TONE_AMBIENT_KELVIN
 

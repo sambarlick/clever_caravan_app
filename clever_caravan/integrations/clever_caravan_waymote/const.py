@@ -36,6 +36,13 @@ CONF_DOMAINS = "domains"
 CONF_COMBOS = "combos"
 
 COMBO_TWO_TONE = "two_tone_light"
+COMBO_AWNING = "awning"
+
+# Awning power handling (adjustable from the integration's Configure screen).
+CONF_AWNING_POWER_OFF_MINUTES = "awning_power_off_minutes"
+CONF_AWNING_STOP_CUTS_POWER = "awning_stop_cuts_power"
+DEFAULT_AWNING_POWER_OFF_MINUTES = 3
+DEFAULT_AWNING_STOP_CUTS_POWER = False
 
 # Colour temperatures used to represent the two tones of a two-tone light.
 # The relays are on/off only; these give HA a normal colour-temp control that
@@ -50,6 +57,8 @@ def combo_channels(combo: dict) -> list[int]:
     """Channel numbers consumed by one combo."""
     if combo.get("type") == COMBO_TWO_TONE:
         return [int(combo["white"]), int(combo["ambient"])]
+    if combo.get("type") == COMBO_AWNING:
+        return [int(combo["power"]), int(combo["extend"]), int(combo["retract"])]
     return []
 
 

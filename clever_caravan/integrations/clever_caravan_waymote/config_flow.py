@@ -27,6 +27,8 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import (
     API_CONFIG_PATH,
+    COMBO_TWO_TONE,
+    CONF_COMBOS,
     CONF_DOMAINS,
     DEFAULT_PORT,
     DOMAIN,
@@ -100,6 +102,8 @@ class WaymoteConfigFlow(ConfigFlow, domain=DOMAIN):
         self._port: int = DEFAULT_PORT
         self._config: dict[str, Any] = {}
         self._enabled: dict[int, str] = {}
+        self._domains: dict[str, str] = {}
+        self._combos: list[dict[str, Any]] = []
         self._reconfigure_entry = None
 
     async def async_step_reconfigure(
@@ -197,19 +201,9 @@ class WaymoteConfigFlow(ConfigFlow, domain=DOMAIN):
                 channel = channel_from_field_key(key)
                 if channel is not None:
                     domains[str(channel)] = value
-
-            data = {
-                CONF_HOST: self._host,
-                CONF_PORT: self._port,
-                CONF_DOMAINS: domains,
-            }
-            if self._reconfigure_entry is not None:
-                return self.async_update_reload_and_abort(
-                    self._reconfigure_entry, data=data
-                )
-            return self.async_create_entry(
-                title=f"Waymote ({self._host})", data=data
-            )
+            self._domains = domains
+            self._combos = []
+            return await self.async_step_combine()
 
         fields: dict[Any, Any] = {}
         for channel in sorted(self._enabled):
@@ -223,3 +217,74 @@ class WaymoteConfigFlow(ConfigFlow, domain=DOMAIN):
         schema = vol.Schema(fields)
 
         return self.async_show_form(step_id="domains", data_schema=schema)
+
+    # --- combined devices --------------------------------------------------
+
+    def _finish(self) -> ConfigFlowResult:
+        data = {
+            CONF_HOST: self._host,
+            CONF_PORT: self._port,
+            CONF_DOMAINS: self._domains,
+            CONF_COMBOS: self._combos,
+        }
+        if self._reconfigure_entry is not None:
+            return self.async_update_reload_and_abort(
+                self._reconfigure_entry, data=data
+            )
+        return self.async_create_entry(title=f"Waymote ({self._host})", data=data)
+
+    def _free_channels(self) -> dict[int, str]:
+        """Enabled outputs not already consumed by a combo."""
+        used = {c for combo in self._combos for c in (combo["white"], combo["ambient"])}
+        return {ch: name for ch, name in self._enabled.items() if ch not in used}
+
+    async def async_step_combine(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Offer to combine outputs into a single device, or finish."""
+        if len(self._free_channels()) < 2:
+            return self._finish()
+        return self.async_show_menu(
+            step_id="combine", menu_options=["two_tone", "finish"]
+        )
+
+    async def async_step_finish(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        return self._finish()
+
+    async def async_step_two_tone(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Combine two outputs (e.g. White + Ambient) into one light."""
+        errors: dict[str, str] = {}
+        free = self._free_channels()
+
+        if user_input is not None:
+            white = int(user_input["white"])
+            ambient = int(user_input["ambient"])
+            if white == ambient:
+                errors["base"] = "same_output"
+            else:
+                self._combos.append(
+                    {
+                        "type": COMBO_TWO_TONE,
+                        "name": user_input["name"].strip()
+                        or f"Light {white}/{ambient}",
+                        "white": white,
+                        "ambient": ambient,
+                    }
+                )
+                return await self.async_step_combine()
+
+        options = {str(ch): f"{name} \u2014 Output {ch}" for ch, name in sorted(free.items())}
+        schema = vol.Schema(
+            {
+                vol.Required("name"): str,
+                vol.Required("white"): vol.In(options),
+                vol.Required("ambient"): vol.In(options),
+            }
+        )
+        return self.async_show_form(
+            step_id="two_tone", data_schema=schema, errors=errors
+        )

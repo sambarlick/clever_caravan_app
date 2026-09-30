@@ -1,3 +1,6 @@
+## 0.4.13
+- Waymote 0.5.0: combine outputs into two-tone lights
+
 ## 0.4.12
 - Dashboard 0.1.27: lights grouped by room on Overview and Lights page; brightness sliders for dimmable lights
 

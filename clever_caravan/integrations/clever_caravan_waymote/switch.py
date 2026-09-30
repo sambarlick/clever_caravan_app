@@ -14,7 +14,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import WaymoteConfigEntry
-from .const import CONF_DOMAINS, DEFAULT_DOMAIN
+from .const import CONF_COMBOS, CONF_DOMAINS, DEFAULT_DOMAIN, channels_in_combos
 from .entity import WaymoteBridgeEntity, WaymoteOutputEntity
 
 AUTORECOVERY_TOPIC = "Waymote/CAN/AutoRecovery"
@@ -24,11 +24,16 @@ def _channels_for_domain(entry: WaymoteConfigEntry, target: str) -> list[int]:
     coordinator = entry.runtime_data
     outputs = (coordinator.data or {}).get("outputs", {})
     domains = entry.data.get(CONF_DOMAINS, {})
+    # Channels used by a combined device are owned by that device, not by a
+    # standalone entity.
+    combined = channels_in_combos(entry.data.get(CONF_COMBOS))
     result = []
     for key, cfg in outputs.items():
         if not (str(key).isdigit() and isinstance(cfg, dict) and cfg.get("enabled")):
             continue
         channel = int(key)
+        if channel in combined:
+            continue
         if domains.get(str(channel), DEFAULT_DOMAIN) == target:
             result.append(channel)
     return sorted(result)

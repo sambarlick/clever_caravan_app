@@ -1,5 +1,5 @@
 ## 0.4.17
-- Dashboard 0.1.30: Drink tank toggles Drinking water; orphaned entities hidden
+- Re-release of 0.4.16 (no changes)
 
 ## 0.4.16
 - Dashboard 0.1.30: Drink tank toggles Drinking water; orphaned entities hidden

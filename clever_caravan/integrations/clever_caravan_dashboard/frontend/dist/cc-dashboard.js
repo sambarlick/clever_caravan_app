@@ -91,7 +91,7 @@ ha-icon{display:inline-flex}
 .cov{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.04);border-radius:14px;padding:8px 10px;flex:none}
 .cov .cvl{flex:1;min-width:0}.cov .l{font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cov .s{font-size:15px;font-weight:700;color:var(--ink)}.cov.moving .s{color:var(--c)}
-.cov .cvb{display:grid;grid-template-columns:repeat(3,minmax(52px,64px));gap:6px}.cov .cvb .b{min-height:48px;font-size:11px;padding:4px 2px}
+.cov .cvb{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(52px,64px);gap:6px}.cov .cvb .b{min-height:48px;font-size:11px;padding:4px 2px}
 .fx{display:flex;gap:6px}.fx .b{flex:1;min-height:44px;flex-direction:row;font-size:12px}
 `;
 
@@ -214,8 +214,9 @@ class CcBase extends HTMLElement {
     const pw = s.attributes.power;
     const state = st === "unknown" || st === "unavailable" ? "—" : st.charAt(0).toUpperCase() + st.slice(1);
     const sub = pw ? `${state} · power ${pw}` : state;
+    const canStop = (Number(s.attributes.supported_features) & 8) === 8; // CoverEntityFeature.STOP
     return `<div class="cov${moving ? " moving" : ""}"><div class="cvl"><div class="l">${esc(label)}</div><div class="s">${esc(sub)}</div></div>
-      <div class="cvb">${this._button("Out", "mdi:arrow-expand-horizontal", `cover:${id}:open`, st === "open" || st === "opening")}${this._button("Stop", "mdi:stop", `cover:${id}:stop`)}${this._button("In", "mdi:arrow-collapse-horizontal", `cover:${id}:close`, st === "closed" || st === "closing")}</div></div>`;
+      <div class="cvb">${this._button("Out", "mdi:arrow-expand-horizontal", `cover:${id}:open`, st === "open" || st === "opening")}${canStop ? this._button("Stop", "mdi:stop", `cover:${id}:stop`) : ""}${this._button("In", "mdi:arrow-collapse-horizontal", `cover:${id}:close`, st === "closed" || st === "closing")}</div></div>`;
   }
 
   _navigate(path) {
@@ -409,7 +410,7 @@ class CcOverview extends CcBase {
       changed = true;
     }
     if (changed) this._render();
-    else if (this.clientWidth) {
+    else if (this.clientWidth && this._compact === (this.clientWidth <= 600)) {
       FIT_CACHE.set(this._sizeKey(), { caps: { ...this._caps }, rcaps: { ...this._rcaps }, sigs: { ...this._sigs } });
       this._fitKey = this._sizeKey();
     }
@@ -732,8 +733,17 @@ class CcOverview extends CcBase {
   _render() {
     if (!this._hass || !this._config || !this.shadowRoot) return;
     const P = this._config.panels || {};
+    // Styles first: :host{display:block} lives in them, and without it there is no width to measure.
+    if (!this._root) {
+      this.shadowRoot.innerHTML = `<style>${BASE_CSS}${OV_CSS}</style><div class="wrap"></div>`;
+      this._root = this.shadowRoot.querySelector(".wrap");
+    }
     const w = this.clientWidth;
-    this._compact = w > 0 && w <= 600;
+    // Not laid out yet: don't guess phone vs tablet. The ResizeObserver renders
+    // as soon as there's a real size (guessing here cached a tablet layout on phones).
+    if (!w) return;
+    this._compact = w <= 600;
+    if (this._fitKey !== this._sizeKey()) this._loadFit();
     const out = [];
     if (P.power) out.push(this._power(P.power));
     if (P.water) out.push(this._water(P.water));
@@ -741,10 +751,6 @@ class CcOverview extends CcBase {
     if (P.lights) out.push(this._lights(P.lights));
     if (P.controls) out.push(this._controls(P.controls));
     if (P.status) out.push(this._status(P.status));
-    if (!this._root) {
-      this.shadowRoot.innerHTML = `<style>${BASE_CSS}${OV_CSS}</style><div class="wrap"></div>`;
-      this._root = this.shadowRoot.querySelector(".wrap");
-    }
     patchHtml(this._root, `${this._top()}<div class="grid">${out.filter(Boolean).join("")}</div>`);
     for (const sel of this._root.querySelectorAll("select[data-sel]")) {
       const v = this._st(sel.dataset.sel)?.state;

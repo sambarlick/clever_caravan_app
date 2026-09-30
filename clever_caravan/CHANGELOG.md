@@ -1,3 +1,6 @@
+## 0.4.21
+- Dashboard 0.1.32: phone layout no longer flips to tablet; Security button always shown; awning Stop only when supported
+
 ## 0.4.20
 - Restarts can now be deferred to the update window; added a Restart immediately option, on by default
 

@@ -68,8 +68,24 @@ class WaymoteOutputEntity:
             self._available = msg.payload.strip() == "online"
             self.async_write_ha_state()
 
+        @callback
+        def _control_received(msg: mqtt.ReceiveMessage) -> None:
+            # The Control topic is retained, so this is the commanded state: it
+            # arrives on start-up and whenever anything else drives the output,
+            # keeping every entity that shares this channel in step. Real status
+            # (above) still wins when the CAN side reports it.
+            payload = msg.payload.strip().upper()
+            if payload in ("ON", "OFF"):
+                self._is_on = payload == "ON"
+                self.async_write_ha_state()
+
         self.async_on_remove(
             await mqtt.async_subscribe(self.hass, self._status_topic, _status_received)
+        )
+        self.async_on_remove(
+            await mqtt.async_subscribe(
+                self.hass, self._command_topic, _control_received
+            )
         )
         self.async_on_remove(
             await mqtt.async_subscribe(

@@ -34,6 +34,7 @@ from . import WaymoteConfigEntry
 from .const import (
     AVAILABILITY_TOPIC,
     STATUS_TOPIC,
+    CONTROL_TOPIC as _CONTROL_TOPIC,
     COMBO_AWNING,
     CONF_AWNING_POWER_OFF_MINUTES,
     CONF_AWNING_STOP_CUTS_POWER,
@@ -82,8 +83,10 @@ class WaymoteAwningCover(CoverEntity):
         self._attr_name = combo.get("name") or f"Awning {index + 1}"
         self._attr_icon = "mdi:awning-outline"
         self._attr_device_info = DeviceInfo(identifiers={(DOMAIN, base)})
-        self._opening = False
-        self._closing = False
+        # Relay states, tracked from the retained Control topics so they are
+        # right on start-up and stay right when something else drives them.
+        self._extend_on = False
+        self._retract_on = False
         self._closed: bool | None = None
         self._available = True
         self._power_on = False
@@ -111,11 +114,12 @@ class WaymoteAwningCover(CoverEntity):
 
     @property
     def is_opening(self) -> bool:
-        return self._opening
+        # The motor drives while its relay is on, so the relay is the truth.
+        return self._extend_on
 
     @property
     def is_closing(self) -> bool:
-        return self._closing
+        return self._retract_on
 
     @property
     def is_closed(self) -> bool | None:
@@ -147,22 +151,50 @@ class WaymoteAwningCover(CoverEntity):
             await mqtt.async_subscribe(self.hass, AVAILABILITY_TOPIC, _availability)
         )
 
-        @callback
-        def _power_status(msg: mqtt.ReceiveMessage) -> None:
-            payload = msg.payload.strip().upper()
-            if payload in ("ON", "OFF"):
-                self._power_on = payload == "ON"
+        def _relay_handler(channel: int):
+            @callback
+            def _handler(msg: mqtt.ReceiveMessage) -> None:
+                payload = msg.payload.strip().upper()
+                if payload not in ("ON", "OFF"):
+                    return
+                on = payload == "ON"
+                if channel == self._power:
+                    self._power_on = on
+                elif channel == self._extend:
+                    self._extend_on = on
+                    if on:
+                        self._closed = False
+                elif channel == self._retract:
+                    self._retract_on = on
+                    if on:
+                        self._closed = True
                 self.async_write_ha_state()
 
-        self.async_on_remove(
-            await mqtt.async_subscribe(
-                self.hass, STATUS_TOPIC.format(n=self._power), _power_status
+            return _handler
+
+        # Control is retained, so these arrive on start-up and give the cover a
+        # real state instead of unknown. Status is subscribed too, for when the
+        # CAN side starts reporting.
+        for channel in (self._power, self._extend, self._retract):
+            handler = _relay_handler(channel)
+            self.async_on_remove(
+                await mqtt.async_subscribe(
+                    self.hass, _CONTROL_TOPIC.format(n=channel), handler
+                )
             )
-        )
+            self.async_on_remove(
+                await mqtt.async_subscribe(
+                    self.hass, STATUS_TOPIC.format(n=channel), handler
+                )
+            )
 
     async def _publish(self, channel: int, on: bool) -> None:
         if channel == self._power:
             self._power_on = on
+        elif channel == self._extend:
+            self._extend_on = on
+        elif channel == self._retract:
+            self._retract_on = on
         await mqtt.async_publish(
             self.hass, CONTROL_TOPIC.format(n=channel), "ON" if on else "OFF",
             qos=1, retain=True,
@@ -208,16 +240,12 @@ class WaymoteAwningCover(CoverEntity):
 
     async def async_open_cover(self, **kwargs: Any) -> None:
         await self._move(self._extend, self._retract)
-        # The motor runs to its end stop and nothing reports back, so we record
-        # the requested end state rather than a transient "opening".
-        self._opening = self._closing = False
         self._closed = False
         self._schedule_power_off()
         self.async_write_ha_state()
 
     async def async_close_cover(self, **kwargs: Any) -> None:
         await self._move(self._retract, self._extend)
-        self._opening = self._closing = False
         self._closed = True
         self._schedule_power_off()
         self.async_write_ha_state()
@@ -230,8 +258,4 @@ class WaymoteAwningCover(CoverEntity):
             await self._publish(self._power, False)
         else:
             self._schedule_power_off()
-        # Stopped part-way: not fully closed as far as we can tell.
-        if self._closing:
-            self._closed = None
-        self._opening = self._closing = False
         self.async_write_ha_state()

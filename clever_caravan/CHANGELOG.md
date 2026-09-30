@@ -1,3 +1,6 @@
+## 0.4.22
+- Waymote 0.6.2: awning state and power now correct on start-up and after Stop
+
 ## 0.4.21
 - Dashboard 0.1.32: phone layout no longer flips to tablet; Security button always shown; awning Stop only when supported
 

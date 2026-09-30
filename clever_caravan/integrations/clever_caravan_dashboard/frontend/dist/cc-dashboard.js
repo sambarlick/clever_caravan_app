@@ -848,7 +848,7 @@ class CcView extends CcBase {
         const n = this._num(t.level) ?? 0;
         const on = t.toggle ? this._on(t.toggle) : false;
         return this._readout(t.label, this._fmt(t.level), {
-          cls: on ? "sel" : "", sub: [t.remaining ? this._fmt(t.remaining) : "", on ? "Selected" : ""].filter(Boolean).join(" · "),
+          cls: on ? "sel" : "", sub: [t.remaining ? this._fmt(t.remaining) : "", on ? t.toggleLabel || "Selected" : ""].filter(Boolean).join(" · "),
           bar: n, barColor: colour(n, t.grey), act: t.toggle ? `toggle:${t.toggle}` : "",
         });
       }).join("")}</div></div>`;
@@ -1098,7 +1098,13 @@ function buildOverview(hass, cats, all, nav) {
     for (const e of byDomain(water, "switch", "input_boolean")) {
       const t = textOf(hass, e);
       const key = /tank/.test(t) ? tankKey(hass, e) : null;
-      const tank = key && tanks.find((x) => x.key === key && !x.toggle);
+      let tank = key && tanks.find((x) => x.key === key && !x.toggle);
+      // Named tanks (e.g. Drink) pair with a switch that names them ("Drinking water"),
+      // but never Grey: the dump valve stays a separate, deliberate button.
+      if (!tank && !/dump/.test(t)) {
+        tank = tanks.find((x) => x.key && !/^\d+$/.test(x.key) && x.key !== "grey" && !x.toggle && new RegExp(`\\b${x.key}`).test(t));
+        if (tank) tank.toggleLabel = "On";
+      }
       if (tank) {
         tank.toggle = e.entity_id;
         continue;
@@ -1305,6 +1311,8 @@ class CleverCaravanStrategy {
       const labelled = (e.labels || []).some((l) => l.startsWith(LABEL_PREFIX));
       const dcxTemp = /^ozxcorp_dcx_/.test(e.unique_id || ""); // TEMP-DCX: always included, any tier
       if (!platforms.has(e.platform) && !labelled && !dcxTemp) continue;
+      // Orphans: entities an integration no longer provides (HA marks them restored).
+      if (hass.states[e.entity_id]?.attributes?.restored === true) continue;
       // Dead third-party leftovers (old MQTT discovery, flat sensors) stay out.
       if (!owned.has(e.platform) && !dcxTemp && hass.states[e.entity_id]?.state === "unavailable") continue;
       // Third-party device trackers (e.g. UniFi clients) would flood Location.

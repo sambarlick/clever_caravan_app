@@ -1,3 +1,6 @@
+## 0.4.16
+- Dashboard 0.1.30: Drink tank toggles Drinking water; orphaned entities hidden
+
 ## 0.4.15
 - Waymote 0.6.0: awning covers with power handling and adjustable settings
 

@@ -17,6 +17,9 @@ configuration:
   weather:
     name: "Clever Caravan: Weather"
     description: Bureau of Meteorology forecasts that follow the van as it moves.
+  core:
+    name: "Clever Caravan: Core"
+    description: Rig-wide modes such as Hibernation (caravan stowed long-term).
   check_interval_minutes:
     name: Check interval (minutes)
     description: How often the App checks for integration changes.

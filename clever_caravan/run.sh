@@ -75,6 +75,7 @@ sync_all() {
   sync_integration power clever_caravan_power
   sync_integration dashboard clever_caravan_dashboard
   sync_integration weather clever_caravan_weather
+  sync_integration core clever_caravan_core
 
   if $changed; then
     touch "$PENDING"

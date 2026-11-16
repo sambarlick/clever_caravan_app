@@ -1,6 +1,7 @@
 """BOM data 'collector' that downloads the observation data."""
 import aiohttp
 import asyncio
+import copy
 import datetime
 import time
 import logging
@@ -23,6 +24,46 @@ RETRY_DELAY_BASE = 2  # seconds
 MAX_CACHE_AGE = 86400  # 24 hours in seconds
 
 
+def _get_current_hourly_row(hourly_data, now=None):
+    """Find the hourly forecast row covering the current time, or fallback to the nearest row."""
+    if not hourly_data or "data" not in hourly_data or not isinstance(hourly_data["data"], list):
+        return None
+    rows = [r for r in hourly_data["data"] if isinstance(r, dict)]
+    if not rows:
+        return None
+    if now is None:
+        now = datetime.datetime.now(datetime.timezone.utc)
+
+    parsed_rows = []
+    for row in rows:
+        time_str = row.get("time")
+        if not time_str:
+            continue
+        try:
+            stamp = datetime.datetime.fromisoformat(time_str)
+        except (ValueError, TypeError):
+            continue
+
+        if stamp.tzinfo is not None:
+            target_now = now if now.tzinfo is not None else now.replace(tzinfo=stamp.tzinfo)
+        else:
+            target_now = now.replace(tzinfo=None) if now.tzinfo is not None else now
+
+        parsed_rows.append((row, stamp, target_now))
+
+        if stamp <= target_now < stamp + datetime.timedelta(hours=1):
+            return row
+
+    # If no row covers the exact 1-hour window, choose the row closest in time
+    if parsed_rows:
+        return min(
+            parsed_rows,
+            key=lambda item: abs((item[1] - item[2]).total_seconds()),
+        )[0]
+
+    return rows[0]
+
+
 class Collector:
     """Collector for PyBoM."""
 
@@ -39,6 +80,9 @@ class Collector:
         self.daily_forecasts_data = None
         self.hourly_forecasts_data = None
         self.warnings_data = None
+        # Cached payloads may survive a failed refresh. Keep its outcome separate
+        # so consumers do not mistake retained data for a successful update.
+        self.last_update_success = False
         self.geohash7 = geohash_encode(latitude, longitude)
         self.geohash6 = self.geohash7[:6]
         # Cache storage with timestamps
@@ -97,7 +141,7 @@ class Collector:
                     if response.status == 200:
                         data = await response.json()
                         # Update cache with new data and timestamp
-                        self._cache[cache_key]["data"] = data
+                        self._cache[cache_key]["data"] = copy.deepcopy(data)
                         self._cache[cache_key]["timestamp"] = time.time()
                         return data
                     else:
@@ -113,6 +157,7 @@ class Collector:
                 if attempt < MAX_RETRIES - 1:
                     await asyncio.sleep(wait_time)
                 else:
+                    self.last_update_success = False
                     _LOGGER.error(
                         f"Error requesting API data: {err}. "
                         "Using cached data if available."
@@ -124,10 +169,11 @@ class Collector:
                         _LOGGER.info(
                             f"Returning cached {cache_key} data from {int(cache_age/60)} minutes ago"
                         )
-                        return cached
+                        return copy.deepcopy(cached)
                     else:
                         _LOGGER.error(f"No cached {cache_key} data available")
                         return None
+        self.last_update_success = False
         return None
 
     async def get_locations_data(self):
@@ -162,6 +208,18 @@ class Collector:
                 is_night = d.get("now_is_night")
                 icon_desc = d.get("icon_descriptor")
 
+                hourly_row = _get_current_hourly_row(self.hourly_forecasts_data)
+
+                # Fallback is_night from hourly feed if missing from daily now dictionary
+                if is_night is None and hourly_row:
+                    is_night = hourly_row.get("is_night")
+
+                # If daily icon is null (e.g. late evening before local midnight rollover),
+                # pull descriptor from current hour in the hourly forecast feed if available:
+                if icon_desc is None and hourly_row:
+                    icon_desc = hourly_row.get("icon_descriptor")
+                    d["icon_descriptor"] = icon_desc
+
                 # Override icon_descriptor if it's night and icon is sunny/mostly_sunny
                 if is_night and icon_desc in {"sunny", "mostly_sunny"}:
                     d["icon_descriptor"] = "clear"
@@ -169,7 +227,21 @@ class Collector:
                 elif not is_night and icon_desc == "clear":
                     d["icon_descriptor"] = "sunny"
 
-            d["mdi_icon"] = MAP_MDI_ICON[d["icon_descriptor"]]
+                # Retain morning minimum temperature during afternoon/evening using BOM's now sliding window
+                if d.get("temp_min") is None:
+                    now_label = (d.get("now_now_label") or "").lower()
+                    later_label = (d.get("now_later_label") or "").lower()
+
+                    if "min" in now_label and d.get("now_temp_now") is not None:
+                        d["temp_min"] = d.get("now_temp_now")
+                    elif "min" in later_label and d.get("now_temp_later") is not None:
+                        d["temp_min"] = d.get("now_temp_later")
+
+                # If short_text is null, pull from current hour in hourly forecast feed
+                if d.get("short_text") is None and hourly_row:
+                    d["short_text"] = hourly_row.get("short_text")
+
+            d["mdi_icon"] = MAP_MDI_ICON.get(d.get("icon_descriptor"))
 
             # If rain amount max is None, set as rain amount min
             if d["rain_amount_max"] is None:
@@ -198,7 +270,7 @@ class Collector:
             elif not is_night and icon_desc == "clear":
                 d["icon_descriptor"] = "sunny"
 
-            d["mdi_icon"] = MAP_MDI_ICON[d["icon_descriptor"]]
+            d["mdi_icon"] = MAP_MDI_ICON.get(d.get("icon_descriptor"))
 
             flatten_dict(["amount"], d["rain"])
             flatten_dict(["rain", "wind"], d)
@@ -219,6 +291,8 @@ class Collector:
         self._refresh_location_if_changed()
 
         headers = {"User-Agent": "MakeThisAPIOpenSource/1.0.0"}
+        # This is inside Throttle: a skipped call must preserve the last outcome.
+        self.last_update_success = True
 
         try:
             async with aiohttp.ClientSession(headers=headers) as session:
@@ -249,14 +323,6 @@ class Collector:
                         self.observations_data["data"]["gust_speed_kilometre"] = "unavailable"
                         self.observations_data["data"]["gust_speed_knot"] = "unavailable"
 
-                # Get daily forecast data
-                data = await self._fetch_with_retry(
-                    session, URL_BASE + self.geohash6 + URL_DAILY, "daily_forecasts"
-                )
-                if data:
-                    self.daily_forecasts_data = data
-                    await self.format_daily_forecast_data()
-
                 # Get hourly forecast data
                 data = await self._fetch_with_retry(
                     session, URL_BASE + self.geohash6 + URL_HOURLY, "hourly_forecasts"
@@ -264,6 +330,14 @@ class Collector:
                 if data:
                     self.hourly_forecasts_data = data
                     await self.format_hourly_forecast_data()
+
+                # Get daily forecast data
+                data = await self._fetch_with_retry(
+                    session, URL_BASE + self.geohash6 + URL_DAILY, "daily_forecasts"
+                )
+                if data:
+                    self.daily_forecasts_data = data
+                    await self.format_daily_forecast_data()
 
                 # Get warnings data
                 data = await self._fetch_with_retry(
@@ -273,5 +347,6 @@ class Collector:
                     self.warnings_data = data
 
         except Exception as err:
+            self.last_update_success = False
             _LOGGER.error(f"Unexpected error during async_update: {err}")
             # Even if we have an unexpected error, we still have our cached data

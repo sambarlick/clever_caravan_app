@@ -1,3 +1,6 @@
+## 0.4.23
+- Weather 0.4.3: today's min temp and icon fixes from upstream BOM; last weather kept during outages
+
 ## 0.4.22
 - Waymote 0.6.2: awning state and power now correct on start-up and after Stop
 

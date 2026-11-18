@@ -32,4 +32,5 @@ OWNED_PLATFORMS = [
     "clever_caravan_location",
     "clever_caravan_weather",
     "clever_caravan_waymote",
+    "clever_caravan_core",
 ]

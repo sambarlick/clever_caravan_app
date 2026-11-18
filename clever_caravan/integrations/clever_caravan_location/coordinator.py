@@ -12,6 +12,7 @@ import logging
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_send
+from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .const import (
@@ -37,7 +38,11 @@ from .const import (
     STATUS_DRIVING,
     STATUS_NOT_DRIVING,
     STATUS_PARKED_UP,
+    STATUS_OPTIONS,
     STATUS_UNKNOWN,
+    STARTUP_GRACE_S,
+    STORAGE_SAVE_DELAY_S,
+    STORAGE_VERSION,
     TIMEZONE_MIN_DELTA_DEG,
 )
 from .abs import AbsResult, lookup_sal_data
@@ -48,10 +53,24 @@ from .wikipedia import WikiResult, fetch_summary
 
 _LOGGER = logging.getLogger(__name__)
 
+def storage_key(entry_id: str) -> str:
+    return f"{DOMAIN}.{entry_id}.state"
+
+
 class CaravanLocationCoordinator:
-    def __init__(self, hass: HomeAssistant, source: LocationSource) -> None:
+    def __init__(
+        self, hass: HomeAssistant, source: LocationSource, entry_id: str
+    ) -> None:
         self.hass = hass
         self.source = source
+
+        # Persisted status + Parked Up timer, so a restart doesn't drop a
+        # parked van back to "Not Driving" for 20 minutes.
+        self._store: Store[dict] = Store(hass, STORAGE_VERSION, storage_key(entry_id))
+        self._started_at = dt_util.utcnow()
+        # Set when a Parked Up state was restored; cleared by the first
+        # post-grace fix, which checks the van wasn't moved while HA was off.
+        self._verify_restored_position = False
 
         self._latest: LocationFix | None = None
         self._status: str | None = STATUS_UNKNOWN
@@ -86,6 +105,74 @@ class CaravanLocationCoordinator:
         self._last_meteostat_month: int | None = None
 
         source.subscribe(self._on_fix)
+
+    # ── Persistence ──────────────────────────────────────────────────────
+
+    async def async_load(self) -> None:
+        """Restore status, Parked Up timer and snapshot from storage.
+
+        Called before the source starts, so the status sensor comes up
+        with its pre-restart value instead of re-running the 20-minute
+        Parked Up timer from zero.
+        """
+        try:
+            data = await self._store.async_load()
+        except Exception:  # corrupt file: start fresh rather than fail setup
+            _LOGGER.warning("Could not read saved location state; starting fresh")
+            return
+        if not data:
+            return
+
+        status = data.get("status")
+        if status not in STATUS_OPTIONS:
+            return
+
+        last_movement = data.get("last_movement")
+        self._last_movement = (
+            dt_util.parse_datetime(last_movement) if last_movement else None
+        )
+        self._snapshot_lat = data.get("snapshot_lat")
+        self._snapshot_lon = data.get("snapshot_lon")
+        self._snapshot_elevation = data.get("snapshot_elevation")
+        self._snapshot_accuracy_h = data.get("snapshot_accuracy_h")
+        self._snapshot_accuracy_v = data.get("snapshot_accuracy_v")
+
+        self._status = status
+        self._previous_status = status
+        self._verify_restored_position = (
+            status == STATUS_PARKED_UP and self._snapshot_lat is not None
+        )
+        _LOGGER.debug("Restored status %s (last movement %s)", status, last_movement)
+
+    @callback
+    def _data_to_save(self) -> dict:
+        return {
+            "status": self._status,
+            "last_movement": (
+                self._last_movement.isoformat() if self._last_movement else None
+            ),
+            "snapshot_lat": self._snapshot_lat,
+            "snapshot_lon": self._snapshot_lon,
+            "snapshot_elevation": self._snapshot_elevation,
+            "snapshot_accuracy_h": self._snapshot_accuracy_h,
+            "snapshot_accuracy_v": self._snapshot_accuracy_v,
+        }
+
+    @callback
+    def _schedule_save(self) -> None:
+        # Coalesced; HA flushes pending saves on shutdown. The short delay
+        # bounds what an unclean power cut can lose.
+        if self._status is None:
+            return  # never overwrite a good saved state with "unknown"
+        self._store.async_delay_save(self._data_to_save, STORAGE_SAVE_DELAY_S)
+
+    async def async_shutdown(self) -> None:
+        """Write state immediately (integration unload/reload)."""
+        if self._status is not None:
+            await self._store.async_save(self._data_to_save())
+
+    def _in_startup_grace(self, now: datetime) -> bool:
+        return (now - self._started_at).total_seconds() < STARTUP_GRACE_S
 
     @property
     def latest(self) -> LocationFix | None:
@@ -178,13 +265,19 @@ class CaravanLocationCoordinator:
 
     @callback
     def _on_fix(self, fix: LocationFix) -> None:
+        if fix.valid and self._verify_restored_position and not self._in_startup_grace(fix.timestamp):
+            self._check_restored_position(fix)
+
         # Parked Up gate: drop fixes that are within snapshot tolerance
         # so the database, zone.home, and downstream automations don't
         # churn on every sub-metre GPS jitter from chatty sources like
         # Starlink. Genuine movement (drives off, gets towed) clears
-        # the gate and resumes normal processing.
+        # the gate and resumes normal processing. The first valid fix
+        # after startup always passes, so the other sensors and the
+        # bootstrap enrichment still populate when Parked Up was restored.
         if (
             self._status == STATUS_PARKED_UP
+            and not self._cold_start_bootstrap_pending
             and fix.valid
             and self._snapshot_lat is not None
             and self._snapshot_lon is not None
@@ -215,6 +308,30 @@ class CaravanLocationCoordinator:
             self.hass.async_create_task(self._run_actions(fix, enrich))
 
         self._previous_status = self._status
+        self._schedule_save()
+
+    @callback
+    def _check_restored_position(self, fix: LocationFix) -> None:
+        """Drop a restored Parked Up if the van was moved while HA was off.
+
+        Runs once, on the first valid fix after the startup grace period.
+        Fast fixes are left to the normal logic (that's real driving).
+        """
+        self._verify_restored_position = False
+        if self._status != STATUS_PARKED_UP or self._snapshot_lat is None:
+            return
+        if fix.speed_kmh is not None and fix.speed_kmh >= SPEED_DRIVING_THRESHOLD:
+            return
+        if not self._delta_exceeds(
+            (self._snapshot_lat, self._snapshot_lon), fix, SET_LOCATION_MIN_DELTA_DEG
+        ):
+            return
+        _LOGGER.info(
+            "Position differs from the saved Parked Up spot; restarting the Parked Up timer"
+        )
+        self._snapshot_lat = None  # _update_snapshot re-anchors on this fix
+        self._last_movement = fix.timestamp
+        self._status = STATUS_NOT_DRIVING
 
     def _should_run_actions(self) -> bool:
         if self._cold_start_bootstrap_pending:
@@ -267,11 +384,23 @@ class CaravanLocationCoordinator:
 
     def _update_status(self, fix: LocationFix) -> None:
         if not fix.valid:
-            self._status = STATUS_UNKNOWN
+            # No lock yet while the GPS reacquires after a restart: keep the
+            # restored status rather than dropping to unknown.
+            if not self._in_startup_grace(fix.timestamp):
+                self._status = STATUS_UNKNOWN
             return
 
         speed = fix.speed_kmh
         now = fix.timestamp
+
+        # Startup grace: GPS speed is unreliable while the fix reacquires.
+        # Hold the current (restored) status instead of reacting to speed.
+        if self._in_startup_grace(now) and (
+            speed is None or speed >= SPEED_NOT_DRIVING_THRESHOLD
+        ):
+            if self._status is STATUS_UNKNOWN:
+                self._status = STATUS_NOT_DRIVING
+            return
 
         if speed is None:
             self._status = STATUS_NOT_DRIVING

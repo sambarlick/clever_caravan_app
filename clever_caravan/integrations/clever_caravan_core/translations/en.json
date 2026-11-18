@@ -1,0 +1,19 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "description": "Set up Clever Caravan: Core? It adds rig-wide modes such as Hibernation."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Clever Caravan: Core is already set up."
+    }
+  },
+  "entity": {
+    "switch": {
+      "hibernation": {
+        "name": "Hibernation"
+      }
+    }
+  }
+}

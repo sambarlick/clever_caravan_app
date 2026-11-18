@@ -11,9 +11,10 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.storage import Store
 
-from .const import CONF_SOURCE, DOMAIN, SERVICE_UPDATE, SOURCE_USB
-from .coordinator import CaravanLocationCoordinator
+from .const import CONF_SOURCE, DOMAIN, SERVICE_UPDATE, SOURCE_USB, STORAGE_VERSION
+from .coordinator import CaravanLocationCoordinator, storage_key
 from .sources import build_source
 
 # USB-specific entities. Disabled by default on non-USB sources via
@@ -75,7 +76,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
 
     source = build_source(hass, dict(entry.data))
-    coordinator = CaravanLocationCoordinator(hass, source)
+    coordinator = CaravanLocationCoordinator(hass, source, entry.entry_id)
+    await coordinator.async_load()  # restore status before any fix arrives
     await source.async_start()
 
     hass.data[DOMAIN][entry.entry_id] = {
@@ -105,7 +107,13 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if unload_ok:
         data = hass.data[DOMAIN].pop(entry.entry_id)
         await data["source"].async_stop()
+        await data["coordinator"].async_shutdown()
         # Last entry going? Tear down the service.
         if not hass.data[DOMAIN]:
             hass.services.async_remove(DOMAIN, SERVICE_UPDATE)
     return unload_ok
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Delete the saved status when the integration is removed."""
+    await Store(hass, STORAGE_VERSION, storage_key(entry.entry_id)).async_remove()

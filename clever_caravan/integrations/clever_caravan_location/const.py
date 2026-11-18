@@ -86,6 +86,15 @@ SPEED_DRIVING_THRESHOLD = 5.0
 SPEED_NOT_DRIVING_THRESHOLD = 1.0
 PARKED_UP_AFTER_MINUTES = 20
 
+# Startup grace period: for this long after the integration starts, speed
+# readings cannot move the status (no false "Driving" from GPS jitter while
+# the fix is reacquired). Real driving is picked up once it expires.
+STARTUP_GRACE_S = 120
+
+# Persisted status/timer state (survives HA restarts and power loss)
+STORAGE_VERSION = 1
+STORAGE_SAVE_DELAY_S = 10
+
 # Climb thresholds (m/s) — gradient classifier
 CLIMB_GRADIENT_THRESHOLD_MS = 0.5
 # Window over which to compute climb rate from elevation samples

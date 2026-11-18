@@ -15,7 +15,8 @@ const P_TPMS = "clever_caravan_tpms";
 const P_LOC = "clever_caravan_location";
 const P_WX = "clever_caravan_weather";
 const P_WAY = "clever_caravan_waymote";
-const OWNED_PLATFORMS = [P_POWER, P_TPMS, P_LOC, P_WX, P_WAY];
+const P_CORE = "clever_caravan_core";
+const OWNED_PLATFORMS = [P_POWER, P_TPMS, P_LOC, P_WX, P_WAY, P_CORE];
 
 const CATS = {
   power: { title: "Power", icon: "mdi:lightning-bolt", c: "#fc8181", rgb: "252,129,129" },
@@ -990,6 +991,7 @@ function classify(hass, e) {
   if (d === "camera") return "security";
   if (d === "device_tracker") return "location";
   if (d === "climate" || d === "weather") return "climate";
+  if (e.platform === P_CORE) return "controls"; // rig-wide modes (Hibernation)
   if (e.platform === P_LOC) return "location";
   if (e.platform === P_TPMS) return "tyres";
   if (e.platform === P_WX) return "climate";
@@ -1080,6 +1082,7 @@ function lightIcon(text, outside) {
 }
 
 function controlIcon(text, d) {
+  if (/hibernat/.test(text)) return "mdi:power-sleep";
   if (/suspension/.test(text)) return "mdi:car-lifted-pickup";
   if (/dust/.test(text)) return "mdi:weather-dust";
   if (d === "fan") return "mdi:fan";
@@ -1226,7 +1229,9 @@ function buildOverview(hass, cats, all, nav) {
   }
 
   const coverEnts = byDomain(cats.get("controls") || [], "cover");
+  // Core modes (Hibernation) first, so the Overview's six-button cap never drops them.
   const controls = byDomain(cats.get("controls") || [], "switch", "input_boolean", "fan")
+    .sort((a, b) => (b.platform === P_CORE) - (a.platform === P_CORE))
     .filter((e) => e.unique_id !== "ozxcorp_dcx_relay") // TEMP-DCX: relay lives in Power
     .filter((e) => !(coverEnts.length && /awning.*power|power.*awning|actuator.*power/.test(textOf(hass, e)))) // cover handles power
     .filter((e) => !/identify|restart|reboot|auto recovery|auto_recovery/.test(textOf(hass, e)));
@@ -1291,7 +1296,7 @@ function buildGroups(hass, cat, list) {
       const stem = CAMERA_STEMS.filter((st) => obj === st || obj.startsWith(`${st}_`)).sort((a, b) => b.length - a.length)[0];
       g = d === "camera" ? "Cameras" : deviceName(hass, e.device_id) || (stem ? stem.replace(/_/g, " ") : "Security");
     } else if (cat === "controls") {
-      g = d === "cover" ? "Awnings" : /awning|actuator/.test(t) ? "Awnings" : d === "button" || /identify|restart|reboot|reset/.test(t) ? "Maintenance" : deviceName(hass, e.device_id) || "Controls";
+      g = e.platform === P_CORE ? "Modes" : d === "cover" ? "Awnings" : /awning|actuator/.test(t) ? "Awnings" : d === "button" || /identify|restart|reboot|reset/.test(t) ? "Maintenance" : deviceName(hass, e.device_id) || "Controls";
     }
     else if (cat === "lights") g = lightRoom(hass, e, OUTSIDE_LIGHT_RE.test(t) || /outside|outdoor|exterior/i.test(areaName(hass, e)));
     else if (cat === "tyres") g = (t.match(/(front|rear)[ _](left|right)/) || [])[0]?.replace("_", " ") || deviceName(hass, e.device_id) || "Tyres";
@@ -1312,7 +1317,7 @@ function buildGroups(hass, cat, list) {
   }
   const out = [...groups.entries()].map(([title, items]) => ({ title, items }));
   if (cat === "controls") {
-    const r = (t) => (t === "Awnings" ? 0 : t === "Maintenance" ? 2 : 1);
+    const r = (t) => (t === "Modes" ? -1 : t === "Awnings" ? 0 : t === "Maintenance" ? 2 : 1);
     out.sort((a, b) => r(a.title) - r(b.title));
     for (const g of out) if (g.title === "Awnings") g.items.sort((a, b) => (domainOf(a) === "cover" ? 0 : 1) - (domainOf(b) === "cover" ? 0 : 1) || a.localeCompare(b));
   }

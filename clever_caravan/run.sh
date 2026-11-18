@@ -10,6 +10,12 @@ AUTH="Authorization: Bearer ${SUPERVISOR_TOKEN}"
 WINDOW_START=$(bashio::config 'update_window_start')
 WINDOW_HOURS=$(bashio::config 'update_window_hours')
 INTERVAL=$(bashio::config 'check_interval_minutes')
+# Telemetry check-in, independent of the (possibly hours-long) check interval.
+HEARTBEAT=15
+TICK=$(( INTERVAL < HEARTBEAT ? INTERVAL : HEARTBEAT ))
+
+# shellcheck source=telemetry.sh
+source /telemetry.sh
 
 in_window() {
   local now start end
@@ -79,6 +85,7 @@ sync_all() {
 
   if $changed; then
     touch "$PENDING"
+    date +%s > "$LAST_UPDATE_FILE"
   fi
 
   if [ -f "$PENDING" ]; then
@@ -97,13 +104,21 @@ bashio::log.info "Clever Caravan App started."
 bashio::log.info "Update window ${WINDOW_START} for ${WINDOW_HOURS}h. Checking every ${INTERVAL}m."
 mkdir -p "$DEST"
 
+fleet_setup
+
 bashio::log.info "Startup sync."
 sync_all
+NEXT_CHECK=$(( $(date +%s) + INTERVAL * 60 ))
+fleet_publish
 
 while true; do
-  sleep "$((INTERVAL * 60))"
-  if in_window; then
-    self_update && continue
-    sync_all
+  sleep "$((TICK * 60))"
+  if [ "$(date +%s)" -ge "$NEXT_CHECK" ]; then
+    NEXT_CHECK=$(( $(date +%s) + INTERVAL * 60 ))
+    if in_window; then
+      self_update && continue
+      sync_all
+    fi
   fi
+  fleet_publish
 done

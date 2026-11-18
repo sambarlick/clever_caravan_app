@@ -1,0 +1,25 @@
+{#- Rendered by HA's /api/template. Facts only HA itself knows. No location data. -#}
+{%- set domains = ['clever_caravan_tpms', 'clever_caravan_location', 'clever_caravan_waymote',
+                   'clever_caravan_power', 'clever_caravan_dashboard', 'clever_caravan_weather',
+                   'clever_caravan_core'] -%}
+{%- set ns = namespace(states={}) -%}
+{%- for d in domains -%}
+  {%- set ents = integration_entities(d) | list -%}
+  {%- if ents | count > 0 -%}
+    {%- set st = config_entry_attr(config_entry_id(ents[0]), 'state') | string -%}
+  {%- else -%}
+    {%- set st = 'not_loaded' -%}
+  {%- endif -%}
+  {%- set ns.states = dict(ns.states, **{d: st}) -%}
+{%- endfor -%}
+{%- set gps = integration_entities('clever_caravan_location') | select('match', 'binary_sensor\\.') | list -%}
+{%- set gps_state = states(gps[0]) if gps | count > 0 else 'unknown' -%}
+{%- set dash = integration_entities('clever_caravan_dashboard') | select('match', 'sensor\\.') | list -%}
+{{ {
+  'states': ns.states,
+  'gps': {
+    'connected': gps_state not in ['unavailable', 'unknown'],
+    'healthy': gps_state == 'on'
+  } if gps | count > 0 else None,
+  'tier': state_attr(dash[0], 'tier') if dash | count > 0 else None
+} | tojson }}

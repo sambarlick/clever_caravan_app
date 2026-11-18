@@ -29,6 +29,9 @@ configuration:
   update_window_hours:
     name: Update window length (hours)
     description: How long the update window stays open.
+  fleet_enrolment:
+    name: Fleet enrolment code
+    description: One-line code from cc-pki.sh. Turns on fleet telemetry for this rig. Leave empty to keep telemetry off.
   restart_now:
     name: Restart immediately
     description: Restart Home Assistant as soon as changes are made, ignoring the update window.

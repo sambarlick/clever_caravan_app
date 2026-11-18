@@ -11,6 +11,7 @@ startup: services
 boot: auto
 hassio_api: true
 hassio_role: homeassistant
+homeassistant_api: true
 map:
   - type: homeassistant_config
     read_only: false
@@ -38,3 +39,4 @@ schema:
   update_window_start: str
   update_window_hours: int(1,24)
   restart_now: bool
+  fleet_enrolment: password?

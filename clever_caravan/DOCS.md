@@ -28,3 +28,12 @@ is 5 minutes.
 ## Support
 
 sam.smarthome.tech@gmail.com
+
+## Fleet telemetry
+
+Paste the rig's one-line code from `cc-pki.sh rig <rig_id>` into **Fleet enrolment
+code**. The App then reports this rig's health to the Clever Caravan fleet every
+15 minutes: App, Home Assistant and integration versions, whether each integration
+loaded, dashboard tier, GPS dongle health, and update times.
+
+No location, camera or usage data is sent. Leave the field empty to keep telemetry off.

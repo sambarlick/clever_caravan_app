@@ -1,3 +1,6 @@
+## 0.4.25
+- Dashboard 0.1.34: faster loading - slim entity list instead of the full registry
+
 ## 0.4.24
 - Location 0.7.8: status survives restarts; Core 0.1.0: Hibernation switch; Dashboard 0.1.33: Hibernation in Controls
 

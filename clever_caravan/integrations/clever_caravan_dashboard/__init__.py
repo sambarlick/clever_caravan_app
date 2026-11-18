@@ -34,6 +34,7 @@ from homeassistant.helpers.event import async_call_later
 from homeassistant.loader import async_get_integration
 
 from .const import DOMAIN, JS_FILENAME, URL_BASE
+from .websocket import async_register_websocket
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -55,6 +56,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if _VERSION_KEY not in hass.data:
         integration = await async_get_integration(hass, DOMAIN)
         hass.data[_VERSION_KEY] = str(integration.version)
+    async_register_websocket(hass)
     await _async_register_static(hass)
     await _async_register_resource(hass)
 

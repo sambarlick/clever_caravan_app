@@ -173,7 +173,8 @@ class CcBase extends HTMLElement {
   _signature() {
     const h = this._hass;
     if (!h || !this._config) return "";
-    return collectIds(this._config).map((id) => { const s = h.states[id]; return s ? s.last_updated + s.state : "-"; }).join("|");
+    if (this._idsFor !== this._config) { this._ids = collectIds(this._config); this._idsFor = this._config; }
+    return this._ids.map((id) => { const s = h.states[id]; return s ? s.last_updated + s.state : "-"; }).join("|");
   }
   _st(id) { return id ? this._hass.states[id] : undefined; }
   _num(id) { const n = parseFloat(this._st(id)?.state); return isNaN(n) ? null : n; }
@@ -1373,7 +1374,10 @@ class CleverCaravanStrategy {
   static async _generate(config, hass) {
     let registry;
     try {
-      registry = await hass.callWS({ type: "config/entity_registry/list" });
+      // Slim list from our integration (~1/6 the size); full registry only as a
+      // fallback while a rig is mid-upgrade and the command isn't there yet.
+      registry = await hass.callWS({ type: "clever_caravan_dashboard/entities" })
+        .catch(() => hass.callWS({ type: "config/entity_registry/list" }));
     } catch (err) {
       console.error("Clever Caravan: entity registry fetch failed", err);
       return messageDashboard("Couldn't read the entity registry. Reload the page to retry.");

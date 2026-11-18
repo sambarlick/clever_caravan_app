@@ -1,3 +1,6 @@
+## 0.4.26
+- Dashboard 0.1.35: no animations; redraws capped at once a second to cut CPU use
+
 ## 0.4.25
 - Dashboard 0.1.34: faster loading - slim entity list instead of the full registry
 

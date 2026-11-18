@@ -68,6 +68,7 @@ const TOGGLE_DOMAINS = new Set(["switch", "input_boolean", "light", "fan", "scri
  * ===================================================================== */
 
 const BASE_CSS = `
+*,*::before,*::after{transition:none!important;animation:none!important}
 :host{box-sizing:border-box;--bg:#111118;--panel:#1b1f2b;--ink:#f0f0f5;--mute:#a0aec0;display:block;color:var(--ink);font-family:var(--ha-font-family-body,Roboto,sans-serif);background:var(--bg)}
 *{box-sizing:border-box}
 ha-icon{display:inline-flex}
@@ -77,16 +78,15 @@ ha-icon{display:inline-flex}
 .v .s{font-size:14px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .v{container-type:inline-size}
 .v.txt .n{white-space:normal;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
-.v.tap{cursor:pointer;border:2px solid transparent;transition:all .2s}.v.tap:active{transform:scale(.97)}
-.v.sel{border-color:var(--c);background:rgba(var(--rgb),.18);box-shadow:0 0 16px rgba(var(--rgb),.45)}.v.sel .l,.v.sel .s{color:var(--c)}
+.v.tap{cursor:pointer;border:2px solid transparent}.v.tap:active{transform:scale(.97)}
+.v.sel{border-color:var(--c);background:rgba(var(--rgb),.18)}.v.sel .l,.v.sel .s{color:var(--c)}
 .v.good .n{color:#48bb78}.v.warn .n{color:#ed8936}.v.bad .n{color:#fc8181}.v.dim{opacity:.45}
 .bar{height:6px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden;margin-top:4px}.bar i{display:block;height:100%;border-radius:4px}
 .b{min-height:56px;border-radius:14px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.04);color:#cbd5e0;
  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font:inherit;font-size:13px;font-weight:700;letter-spacing:.04em;
- text-transform:uppercase;cursor:pointer;padding:6px 4px;min-width:0;transition:all .2s;text-align:center;line-height:1.2}
+ text-transform:uppercase;cursor:pointer;padding:6px 4px;min-width:0;text-align:center;line-height:1.2}
 .b span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-width:100%}
-.b.on{background:rgba(var(--rgb),.3);border:2px solid var(--c);color:var(--c);box-shadow:0 0 16px rgba(var(--rgb),.45)}
-.b.on ha-icon{filter:drop-shadow(0 0 6px var(--c))}
+.b.on{background:rgba(var(--rgb),.3);border:2px solid var(--c);color:var(--c)}
 .b.alert{background:rgba(252,129,129,.25);border:2px solid #fc8181;color:#fc8181}
 .b:active{transform:scale(.97)}
 .cov{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.04);border-radius:14px;padding:8px 10px;flex:none}
@@ -137,6 +137,8 @@ function patchHtml(el, html) {
   patchChildren(el, tpl.content);
 }
 
+const RENDER_INTERVAL = 1000; // ms between redraws on busy rigs
+
 const DECIMALS = { "%": 0, W: 0, V: 1, A: 1, "°C": 1, "°F": 1, "km/h": 0, psi: 1, kWh: 1, L: 1, m: 0, Ah: 1 };
 
 class CcBase extends HTMLElement {
@@ -167,7 +169,38 @@ class CcBase extends HTMLElement {
     const sig = this._signature();
     if (sig !== this._sig) {
       this._sig = sig;
+      this._scheduleRender();
+    }
+  }
+  // Busy rigs (Victron, CAN) push many state updates a second. Redraw at most
+  // once a second, never while the screen/tab is hidden, and straight away
+  // after a tap so controls still feel instant.
+  _scheduleRender() {
+    if (document.hidden) {
+      this._dirty = true;
+      if (!this._onVisible) {
+        this._onVisible = () => {
+          if (document.hidden) return;
+          document.removeEventListener("visibilitychange", this._onVisible);
+          this._onVisible = null;
+          if (this._dirty) { this._dirty = false; this._lastRender = performance.now(); this._render(); }
+        };
+        document.addEventListener("visibilitychange", this._onVisible);
+      }
+      return;
+    }
+    const wait = RENDER_INTERVAL - (performance.now() - (this._lastRender || 0));
+    if (wait <= 0) {
+      clearTimeout(this._pending);
+      this._pending = null;
+      this._lastRender = performance.now();
       this._render();
+    } else if (!this._pending) {
+      this._pending = setTimeout(() => {
+        this._pending = null;
+        this._lastRender = performance.now();
+        this._render();
+      }, wait);
     }
   }
   _signature() {
@@ -229,6 +262,7 @@ class CcBase extends HTMLElement {
   _click(ev) {
     const el = ev.composedPath().find((n) => n.dataset && n.dataset.act);
     if (!el) return;
+    this._lastRender = 0; // show the result of a tap without waiting
     const [kind, ...rest] = el.dataset.act.split(":");
     const arg = rest.join(":");
     const h = this._hass;
@@ -301,8 +335,8 @@ const OV_CSS = `
 .chip ha-icon{--mdc-icon-size:18px;color:#67e8f9}.chip.away ha-icon{color:#718096}
 .grid{display:grid;gap:12px;grid-template-columns:repeat(var(--cols,3),minmax(0,1fr));grid-auto-rows:minmax(0,1fr);min-height:0}
 .p{border-radius:20px;padding:14px;display:flex;flex-direction:column;gap:12px;min-height:0;overflow:hidden;container-type:size;
- background:linear-gradient(135deg,rgba(var(--rgb),.14) 0%,var(--panel) 55%,#161a24 100%);border:1px solid rgba(var(--rgb),.35);box-shadow:0 4px 24px rgba(var(--rgb),.12)}
-.p.alarm{border:2px solid #fc8181;box-shadow:0 0 24px rgba(252,129,129,.35)}
+ background:linear-gradient(135deg,rgba(var(--rgb),.14) 0%,var(--panel) 55%,#161a24 100%);border:1px solid rgba(var(--rgb),.35)}
+.p.alarm{border:2px solid #fc8181}
 .ph{display:flex;align-items:center;gap:10px;cursor:pointer;min-height:40px;flex:none}
 .ph .ic{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:rgba(var(--rgb),.18);flex:none}
 .ph .ic ha-icon{--mdc-icon-size:24px;color:var(--c)}
@@ -320,7 +354,7 @@ const OV_CSS = `
  letter-spacing:.03em;text-transform:uppercase;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:4px 2px;min-width:0}
 .seg .opt span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .seg .opt ha-icon{--mdc-icon-size:20px}
-.seg .opt.on{background:rgba(var(--rgb),.3);border:2px solid var(--c);color:var(--c);box-shadow:0 0 12px rgba(var(--rgb),.4)}
+.seg .opt.on{background:rgba(var(--rgb),.3);border:2px solid var(--c);color:var(--c)}
 .seg .opt:active{transform:scale(.97)}
 .seg .dd{display:none;position:relative;align-items:center;gap:6px;min-height:52px}
 .seg .dd .dv{flex:1;min-width:0}.seg .dd .dv .l{margin:0}
@@ -331,7 +365,7 @@ const OV_CSS = `
 .seg.tog{display:flex;align-items:center;gap:6px;min-height:60px;cursor:pointer;border:2px solid rgba(255,255,255,.08)}
 .seg.tog .dv{flex:1;min-width:0}.seg.tog .l{margin:0}
 .seg.tog .n{font-size:22px;font-weight:700;color:var(--mute)}.seg.tog ha-icon{--mdc-icon-size:28px;color:var(--mute)}
-.seg.tog.on{border-color:var(--c);background:rgba(var(--rgb),.2);box-shadow:0 0 14px rgba(var(--rgb),.4)}.seg.tog.on .n,.seg.tog.on ha-icon{color:var(--c)}
+.seg.tog.on{border-color:var(--c);background:rgba(var(--rgb),.2)}.seg.tog.on .n,.seg.tog.on ha-icon{color:var(--c)}
 .seg.tog:active{transform:scale(.98)}
 .ph .more{font-size:14px;font-weight:700;color:var(--mute);background:rgba(255,255,255,.06);border-radius:999px;padding:2px 10px;margin-left:auto}
 .ph .more+.go{margin-left:0}
@@ -365,7 +399,7 @@ class CcOverview extends CcBase {
   }
   connectedCallback() {
     this._loadFit();
-    this._timer = setInterval(() => this._render(), 30000);
+    this._timer = setInterval(() => { if (!document.hidden) this._render(); }, 30000);
     if (window.ResizeObserver && !this._ro) {
       this._ro = new ResizeObserver(() => {
         cancelAnimationFrame(this._roFrame);
